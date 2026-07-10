@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     # ==========================
     # PostgreSQL
     # ==========================
+    POSTGRES_HOST: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
@@ -20,11 +21,13 @@ class Settings(BaseSettings):
     # ==========================
     # Redis
     # ==========================
+    REDIS_HOST: str
     REDIS_PORT: int
 
     # ==========================
     # Qdrant
     # ==========================
+    QDRANT_HOST: str
     QDRANT_HTTP_PORT: int
 
     model_config = SettingsConfigDict(
@@ -32,6 +35,22 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=True,
     )
+
+    @property
+    def postgres_url(self) -> str:
+        # postgresql+psycopg uses psycopg3 async driver (psycopg[binary] in requirements.txt)
+        return (
+            f"postgresql+psycopg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
+
+    @property
+    def redis_url(self) -> str:
+        return f"redis://{self.REDIS_HOST}:{self.REDIS_PORT}"
+
+    @property
+    def qdrant_url(self) -> str:
+        return f"http://{self.QDRANT_HOST}:{self.QDRANT_HTTP_PORT}"
 
 
 @lru_cache
