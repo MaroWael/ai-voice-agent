@@ -14,7 +14,7 @@ class AudioSource(ABC):
     """
 
     @abstractmethod
-    def stream(self) -> AsyncGenerator[AudioFrame, None]:
+    async def stream(self) -> AsyncGenerator[AudioFrame, None]:
         """
         Continuously yield AudioFrame objects until the source is exhausted
         or the caller cancels the generator.
