@@ -30,6 +30,15 @@ class Settings(BaseSettings):
     QDRANT_HOST: str
     QDRANT_HTTP_PORT: int
 
+    # ==========================
+    # Audio Pipeline
+    # ==========================
+    # Canonical format that every layer downstream of the Adapter expects.
+    # These are architectural constants, not deployment-specific values.
+    # They have default values here and must never be required in .env.
+    PIPELINE_SAMPLE_RATE: int = 16_000
+    PIPELINE_CHANNELS: int = 1
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
