@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     # ==========================
     # Speech-to-Text (STT)
     # ==========================
-    STT_MODEL: str = "small"
+    STT_MODEL: str = "medium"
     STT_DEVICE: str = "cpu"
     STT_COMPUTE_TYPE: str = "float32"
     STT_BEAM_SIZE: int = 5
