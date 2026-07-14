@@ -29,3 +29,32 @@ services:
     volumes:
       - ${QDRANT_STORAGE:-./storage/qdrant}:/qdrant/storage
     restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:0.31.2
+    container_name: voice_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ${OLLAMA_STORAGE:-./storage/ollama}:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ollama-pull-model:
+    image: ollama/ollama:0.31.2
+    container_name: voice_ollama_pull
+    volumes:
+      - ${OLLAMA_STORAGE:-./storage/ollama}:/root/.ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - LLM_MODEL=${LLM_MODEL}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: /bin/sh
+    command: ["-c", "ollama list | grep -q '${LLM_MODEL}' || ollama pull ${LLM_MODEL}"]
