@@ -79,6 +79,7 @@ async def root():
     }
 
 
+from typing import Literal
 from pydantic import BaseModel
 import contextlib
 import sys
@@ -90,10 +91,16 @@ class TranscriptionResponse(BaseModel):
     end_timestamp: float
 
 
+class LLMStructuredResponse(BaseModel):
+    action: Literal["retrieval", "tool", "human"]
+    reason: str
+    message: str
+
+
 class DemoOrchestratorResponse(BaseModel):
     transcription: str
     language: str | None
-    response: str
+    response: LLMStructuredResponse
 
 _recognizer_cache = None
 _llm_cache = None
@@ -208,13 +215,22 @@ async def demo_orchestrator():
 
     logger.info("Transcription: %s", result.transcription.text)
     logger.info("Language: %s", result.transcription.language)
-    logger.info("AI Response: %s", result.response.text)
+    logger.info(
+        "AI Response - Action: %s, Reason: %s, Message: %s",
+        result.response.action,
+        result.response.reason,
+        result.response.message
+    )
     logger.info("Total pipeline completed in %.2f seconds", pipeline_elapsed)
 
     return DemoOrchestratorResponse(
         transcription=result.transcription.text,
         language=result.transcription.language,
-        response=result.response.text
+        response=LLMStructuredResponse(
+            action=result.response.action,
+            reason=result.response.reason,
+            message=result.response.message
+        )
     )
 
 

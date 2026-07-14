@@ -73,9 +73,32 @@ Assistant:
             
         if "response" not in data:
             raise RuntimeError(f"Ollama response payload missing expected 'response' key: {data}")
+
+        response_text = data["response"].strip()
+        
+        try:
+            import json
+            parsed_data = json.loads(response_text)
+        except Exception as exc:
+            raise RuntimeError(f"LLM returned invalid JSON: {response_text}") from exc
+            
+        if not isinstance(parsed_data, dict):
+            raise RuntimeError(f"Unexpected response format from LLM (expected JSON object): {response_text}")
+            
+        for field in ("action", "reason", "message"):
+            if field not in parsed_data:
+                raise RuntimeError(f"LLM response JSON is missing required field '{field}': {response_text}")
+                
+        allowed_actions = ("retrieval", "tool", "human")
+        if parsed_data["action"] not in allowed_actions:
+            raise RuntimeError(
+                f"LLM response 'action' must be one of {allowed_actions}, got '{parsed_data['action']}': {response_text}"
+            )
         
         return AIResponse(
-            text=data["response"].strip(),
+            action=parsed_data["action"],
+            reason=parsed_data["reason"],
+            message=parsed_data["message"],
             language=transcription.language,
         )
 
