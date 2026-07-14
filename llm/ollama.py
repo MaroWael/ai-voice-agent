@@ -29,17 +29,19 @@ class OllamaLanguageModel(LanguageModel):
         if self._client is None:
             raise RuntimeError("LanguageModel not initialized. Call initialize() first.")
             
-        prompt_template = (
-            "You are a helpful, direct, and concise customer service assistant. "
-            "Respond to the user's inquiry briefly, directly, and in one or two short sentences. "
-            "Avoid unnecessarily long answers.\n\n"
-            f"User: {transcription.text}\n"
-            "Assistant:"
-        )
+        from llm.prompts import ROUTER_PROMPT
+
+        prompt = f"""{ROUTER_PROMPT}
+
+Customer:
+{transcription.text}
+
+Assistant:
+"""
 
         payload = {
             "model": self.model_name,
-            "prompt": prompt_template,
+            "prompt": prompt,
             "stream": False,
             "think": False,
             "keep_alive": "30m",
