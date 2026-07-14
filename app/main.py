@@ -1,5 +1,8 @@
+import sys
 import logging
 import asyncio
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -131,6 +134,69 @@ async def demo_stt():
         language=transcription_result.language,
         start_timestamp=transcription_result.start_timestamp,
         end_timestamp=transcription_result.end_timestamp
+    )
+
+
+@app.post("/demo/orchestrator", response_model=TranscriptionResponse)
+async def demo_orchestrator():
+    import sys
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8")
+        except Exception:
+            pass
+    from input.sources.microphone import MicrophoneSource
+    from input.adapter.audio_frame_adapter import AudioFrameAdapter
+    from input.vad.silero import SileroVAD
+    from input.buffer.speech_buffer import SpeechBuffer
+    from input.stt.faster_whisper import FasterWhisperSTT
+    from orchestration.orchestrator import Orchestrator
+
+    global _recognizer_cache
+
+    if _recognizer_cache is None:
+        _recognizer_cache = FasterWhisperSTT()
+        await _recognizer_cache.initialize()
+    recognizer = _recognizer_cache
+
+    source = MicrophoneSource(frame_duration_ms=32)
+    adapter = AudioFrameAdapter()
+    vad = SileroVAD(threshold=0.5)
+    buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
+
+    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer)
+
+    print("----------------------------------------")
+    print("Orchestrator Started")
+    print("----------------------------------------")
+    print()
+    print("Listening...")
+    sys.stdout.flush()
+
+    try:
+        transcription = await orchestrator.run()
+    except Exception as exc:
+        logger.exception("Orchestration pipeline execution failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    print("----------------------------------------")
+    print("Transcription")
+    print("----------------------------------------")
+    print()
+    try:
+        print(transcription.text)
+    except UnicodeEncodeError:
+        encoding = sys.stdout.encoding or "utf-8"
+        print(transcription.text.encode(encoding, errors="replace").decode(encoding))
+    print()
+    print(f"Language: {transcription.language}")
+    sys.stdout.flush()
+
+    return TranscriptionResponse(
+        text=transcription.text,
+        language=transcription.language,
+        start_timestamp=transcription.start_timestamp,
+        end_timestamp=transcription.end_timestamp
     )
 
 
