@@ -11,6 +11,7 @@ from app.config.settings import settings
 from app.db.postgres import check_postgres
 from app.db.qdrant import check_qdrant
 from app.db.redis import check_redis
+from llm.check import check_llm
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -42,12 +43,26 @@ async def lifespan(app: FastAPI):
         logger.error("Qdrant connection failed: %s", exc)
         raise
 
+    try:
+        await check_llm()
+    except Exception as exc:
+        logger.error("LLM connection failed: %s", exc)
+        raise
+
     logger.info("%s is ready.", settings.PROJECT_NAME)
 
     yield  # application runs here
 
     # ── Shutdown ─────────────────────────────────────────────────────────────
     logger.info("%s is shutting down.", settings.PROJECT_NAME)
+
+    global _llm_cache
+    if _llm_cache is not None:
+        try:
+            logger.info("Closing LLM cache...")
+            await _llm_cache.close()
+        except Exception as exc:
+            logger.error("Failed to close LLM cache: %s", exc)
 
 
 app = FastAPI(
@@ -74,7 +89,14 @@ class TranscriptionResponse(BaseModel):
     start_timestamp: float
     end_timestamp: float
 
+
+class DemoOrchestratorResponse(BaseModel):
+    transcription: str
+    language: str | None
+    response: str
+
 _recognizer_cache = None
+_llm_cache = None
 
 @app.post("/demo/stt", response_model=TranscriptionResponse)
 async def demo_stt():
@@ -137,7 +159,7 @@ async def demo_stt():
     )
 
 
-@app.post("/demo/orchestrator", response_model=TranscriptionResponse)
+@app.post("/demo/orchestrator", response_model=DemoOrchestratorResponse)
 async def demo_orchestrator():
     import sys
     if hasattr(sys.stdout, "reconfigure"):
@@ -151,52 +173,48 @@ async def demo_orchestrator():
     from input.buffer.speech_buffer import SpeechBuffer
     from input.stt.faster_whisper import FasterWhisperSTT
     from orchestration.orchestrator import Orchestrator
+    from llm.ollama import OllamaLanguageModel
 
-    global _recognizer_cache
+    global _recognizer_cache, _llm_cache
 
     if _recognizer_cache is None:
         _recognizer_cache = FasterWhisperSTT()
         await _recognizer_cache.initialize()
     recognizer = _recognizer_cache
 
+    if _llm_cache is None:
+        _llm_cache = OllamaLanguageModel()
+        await _llm_cache.initialize()
+    llm = _llm_cache
+
     source = MicrophoneSource(frame_duration_ms=32)
     adapter = AudioFrameAdapter()
     vad = SileroVAD(threshold=0.5)
     buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
 
-    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer)
+    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer, llm)
 
-    print("----------------------------------------")
-    print("Orchestrator Started")
-    print("----------------------------------------")
-    print()
-    print("Listening...")
-    sys.stdout.flush()
+    logger.info("Orchestrator Started")
+    logger.info("Listening...")
 
+    import time
+    start_pipeline = time.perf_counter()
     try:
-        transcription = await orchestrator.run()
+        result = await orchestrator.run()
     except Exception as exc:
         logger.exception("Orchestration pipeline execution failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+    pipeline_elapsed = time.perf_counter() - start_pipeline
 
-    print("----------------------------------------")
-    print("Transcription")
-    print("----------------------------------------")
-    print()
-    try:
-        print(transcription.text)
-    except UnicodeEncodeError:
-        encoding = sys.stdout.encoding or "utf-8"
-        print(transcription.text.encode(encoding, errors="replace").decode(encoding))
-    print()
-    print(f"Language: {transcription.language}")
-    sys.stdout.flush()
+    logger.info("Transcription: %s", result.transcription.text)
+    logger.info("Language: %s", result.transcription.language)
+    logger.info("AI Response: %s", result.response.text)
+    logger.info("Total pipeline completed in %.2f seconds", pipeline_elapsed)
 
-    return TranscriptionResponse(
-        text=transcription.text,
-        language=transcription.language,
-        start_timestamp=transcription.start_timestamp,
-        end_timestamp=transcription.end_timestamp
+    return DemoOrchestratorResponse(
+        transcription=result.transcription.text,
+        language=result.transcription.language,
+        response=result.response.text
     )
 
 

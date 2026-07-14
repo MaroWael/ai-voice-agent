@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     STT_COMPUTE_TYPE: str = "float32"
     STT_BEAM_SIZE: int = 5
 
+    # ==========================
+    # Language Model (LLM)
+    # ==========================
+    LLM_BASE_URL: str = "http://localhost:11434"
+    LLM_MODEL: str = "qwen3:1.7b"
+    LLM_TIMEOUT: float = 180.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
