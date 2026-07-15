@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     # ==========================
     STT_MODEL: str = "medium"
     STT_DEVICE: str = "cpu"
-    STT_COMPUTE_TYPE: str = "float32"
+    STT_COMPUTE_TYPE: str = "int8"
     STT_BEAM_SIZE: int = 5
 
     # ==========================
