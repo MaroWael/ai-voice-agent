@@ -7,6 +7,7 @@ from input.vad.base import VoiceActivityDetector
 from input.buffer.speech_buffer import SpeechBuffer
 from input.stt.base import SpeechRecognizer
 from input.models.audio_frame import AudioFrame
+from input.models.speech_segment import SpeechSegment
 from input.models.transcription import Transcription
 from llm.base import LanguageModel
 from llm.models import AIResponse
@@ -43,6 +44,38 @@ class Orchestrator:
         self.recognizer = recognizer
         self.llm = llm
 
+    async def receive_audio_frame(self, frame: AudioFrame) -> Optional[SpeechSegment]:
+        """
+        Ingests a single AudioFrame. Adapts it, runs VAD, and processes the speech buffer.
+        If a completed SpeechSegment is emitted, resets the VAD and buffer, and returns it.
+        Otherwise, returns None.
+        """
+        adapted_frame = self.adapter.adapt(frame)
+        vad_result = await self.vad.detect(adapted_frame)
+        segment = await self.buffer.process(adapted_frame, vad_result)
+
+        if segment is not None:
+            self.reset()
+            return segment
+        return None
+
+    async def process_speech_segment(self, segment: SpeechSegment) -> OrchestratorResult:
+        """
+        Processes a completed SpeechSegment. Transcribes it and runs the LLM router.
+        """
+        import time
+        start_stt = time.perf_counter()
+        transcription = await self.recognizer.transcribe(segment)
+        stt_elapsed = time.perf_counter() - start_stt
+        logger.info("STT completed in %.2f seconds", stt_elapsed)
+
+        start_llm = time.perf_counter()
+        response = await self.llm.generate(transcription)
+        llm_elapsed = time.perf_counter() - start_llm
+        logger.info("LLM completed in %.2f seconds", llm_elapsed)
+
+        return OrchestratorResult(transcription=transcription, response=response)
+
     async def process_audio_frame(self, frame: AudioFrame) -> Optional[OrchestratorResult]:
         """
         Processes a single AudioFrame.
@@ -50,27 +83,9 @@ class Orchestrator:
         If a complete SpeechSegment is emitted, transcribes it and runs the LLM,
         returning an OrchestratorResult. Otherwise returns None.
         """
-        adapted_frame = self.adapter.adapt(frame)
-        vad_result = await self.vad.detect(adapted_frame)
-        segment = await self.buffer.process(adapted_frame, vad_result)
-
+        segment = await self.receive_audio_frame(frame)
         if segment is not None:
-            try:
-                import time
-                start_stt = time.perf_counter()
-                transcription = await self.recognizer.transcribe(segment)
-                stt_elapsed = time.perf_counter() - start_stt
-                logger.info("STT completed in %.2f seconds", stt_elapsed)
-
-                start_llm = time.perf_counter()
-                response = await self.llm.generate(transcription)
-                llm_elapsed = time.perf_counter() - start_llm
-                logger.info("LLM completed in %.2f seconds", llm_elapsed)
-
-                return OrchestratorResult(transcription=transcription, response=response)
-            finally:
-                self.reset()
-
+            return await self.process_speech_segment(segment)
         return None
 
     def reset(self) -> None:

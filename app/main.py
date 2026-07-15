@@ -91,8 +91,12 @@ class TranscriptionResponse(BaseModel):
     end_timestamp: float
 
 
+from llm.models import RoutingAction, CustomerServiceDepartment
+
+
 class LLMStructuredResponse(BaseModel):
-    action: Literal["retrieval", "tool", "human"]
+    action: RoutingAction
+    department: CustomerServiceDepartment | None
     reason: str
     message: str
 
@@ -228,6 +232,7 @@ async def demo_orchestrator():
         language=result.transcription.language,
         response=LLMStructuredResponse(
             action=result.response.action,
+            department=result.response.department,
             reason=result.response.reason,
             message=result.response.message
         )
@@ -253,6 +258,7 @@ async def websocket_audio(
     from input.stt.faster_whisper import FasterWhisperSTT
     import numpy as np
     import time
+    import asyncio
 
     global _recognizer_cache, _llm_cache
 
@@ -272,6 +278,47 @@ async def websocket_audio(
     
     # Instantiate Orchestrator (without audio_source for WebSocket streaming)
     orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm)
+
+    # Bounded queue of size 3 for completed speech segments
+    queue = asyncio.Queue(maxsize=3)
+
+    # Background worker task to process enqueued segments
+    async def worker():
+        try:
+            while True:
+                segment = await queue.get()
+                try:
+                    result = await orchestrator.process_speech_segment(segment)
+                    response_payload = {
+                        "transcription": result.transcription.text,
+                        "language": result.transcription.language,
+                        "response": {
+                            "action": result.response.action,
+                            "department": result.response.department,
+                            "reason": result.response.reason,
+                            "message": result.response.message
+                        }
+                    }
+                    try:
+                        await websocket.send_json(response_payload)
+                    except (WebSocketDisconnect, RuntimeError) as send_err:
+                        logger.info("Client disconnected while sending JSON response. Worker exiting.")
+                        return
+                except Exception as exc:
+                    logger.exception("Error during background speech processing: %s", exc)
+                    try:
+                        await websocket.close(code=1011, reason="Internal processing error")
+                    except Exception:
+                        pass
+                    return
+                finally:
+                    queue.task_done()
+        except asyncio.CancelledError:
+            logger.info("Background worker task cancelled.")
+            raise
+
+    # Start the worker task
+    worker_task = asyncio.create_task(worker())
 
     start_time = time.monotonic()
     processed_samples = 0
@@ -299,7 +346,7 @@ async def websocket_audio(
             else:
                 logger.error("Unsupported format in WebSocket: %s", format)
                 await websocket.close(code=1003, reason=f"Unsupported format: {format}")
-                return
+                break
 
             # Compute continuous monotonic timestamp based on samples processed
             # to keep input timeline perfectly aligned.
@@ -313,30 +360,14 @@ async def websocket_audio(
                 timestamp=chunk_timestamp
             )
 
-            try:
-                result = await orchestrator.process_audio_frame(frame)
-                if result is not None:
-                    response_payload = {
-                        "transcription": result.transcription.text,
-                        "language": result.transcription.language,
-                        "response": {
-                            "action": result.response.action,
-                            "reason": result.response.reason,
-                            "message": result.response.message
-                        }
-                    }
-                    try:
-                        await websocket.send_json(response_payload)
-                    except (WebSocketDisconnect, RuntimeError) as send_err:
-                        logger.info("Client disconnected while sending JSON response. Exiting loop.")
-                        return
-            except Exception as exc:
-                logger.exception("Error processing frame: %s", exc)
-                try:
-                    await websocket.close(code=1011, reason="Internal processing error")
-                except Exception:
-                    pass
-                return
+            # receive_audio_frame only adapts, VAD detects, buffers (extremely fast, non-blocking)
+            segment = await orchestrator.receive_audio_frame(frame)
+            if segment is not None:
+                # Bounded queue non-blocking push with Drop Newest policy
+                if queue.full():
+                    logger.warning("Speech queue is full. Dropping the newest speech segment to prevent blocking.")
+                else:
+                    queue.put_nowait(segment)
 
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected by client")
@@ -346,6 +377,21 @@ async def websocket_audio(
             await websocket.close(code=1011, reason=str(exc))
         except Exception:
             pass
+    finally:
+        # Cancel worker and wait for it to stop
+        logger.info("Cleaning up WebSocket session background task...")
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        # Clear the queue
+        while not queue.empty():
+            try:
+                queue.get_nowait()
+                queue.task_done()
+            except asyncio.QueueEmpty:
+                break
 
 
 if __name__ == "__main__":
