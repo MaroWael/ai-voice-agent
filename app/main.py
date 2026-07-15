@@ -5,7 +5,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 
 from app.config.settings import settings
 from app.db.postgres import check_postgres
@@ -232,6 +232,120 @@ async def demo_orchestrator():
             message=result.response.message
         )
     )
+
+
+@app.websocket("/ws/audio")
+async def websocket_audio(
+    websocket: WebSocket,
+    sample_rate: int = 16000,
+    channels: int = 1,
+    format: Literal["int16", "float32"] = "int16"
+):
+    await websocket.accept()
+    logger.info("WebSocket connection accepted: sample_rate=%d, channels=%d, format=%s", sample_rate, channels, format)
+
+    from input.adapter.audio_frame_adapter import AudioFrameAdapter
+    from input.vad.silero import SileroVAD
+    from input.buffer.speech_buffer import SpeechBuffer
+    from input.models.audio_frame import AudioFrame
+    from orchestration.orchestrator import Orchestrator
+    from llm.ollama import OllamaLanguageModel
+    from input.stt.faster_whisper import FasterWhisperSTT
+    import numpy as np
+    import time
+
+    global _recognizer_cache, _llm_cache
+
+    if _recognizer_cache is None:
+        _recognizer_cache = FasterWhisperSTT()
+        await _recognizer_cache.initialize()
+    recognizer = _recognizer_cache
+
+    if _llm_cache is None:
+        _llm_cache = OllamaLanguageModel()
+        await _llm_cache.initialize()
+    llm = _llm_cache
+
+    adapter = AudioFrameAdapter()
+    vad = SileroVAD(threshold=0.5)
+    buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
+    
+    # Instantiate Orchestrator (without audio_source for WebSocket streaming)
+    orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm)
+
+    start_time = time.monotonic()
+    processed_samples = 0
+
+    try:
+        while True:
+            data = await websocket.receive_bytes()
+            
+            if format == "int16":
+                item_size = 2
+                remainder = len(data) % item_size
+                if remainder != 0:
+                    data = data[:-remainder]
+                if not data:
+                    continue
+                samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+            elif format == "float32":
+                item_size = 4
+                remainder = len(data) % item_size
+                if remainder != 0:
+                    data = data[:-remainder]
+                if not data:
+                    continue
+                samples = np.frombuffer(data, dtype=np.float32)
+            else:
+                logger.error("Unsupported format in WebSocket: %s", format)
+                await websocket.close(code=1003, reason=f"Unsupported format: {format}")
+                return
+
+            # Compute continuous monotonic timestamp based on samples processed
+            # to keep input timeline perfectly aligned.
+            chunk_timestamp = start_time + (processed_samples / sample_rate)
+            processed_samples += len(samples)
+
+            frame = AudioFrame(
+                samples=samples,
+                sample_rate=sample_rate,
+                channels=channels,
+                timestamp=chunk_timestamp
+            )
+
+            try:
+                result = await orchestrator.process_audio_frame(frame)
+                if result is not None:
+                    response_payload = {
+                        "transcription": result.transcription.text,
+                        "language": result.transcription.language,
+                        "response": {
+                            "action": result.response.action,
+                            "reason": result.response.reason,
+                            "message": result.response.message
+                        }
+                    }
+                    try:
+                        await websocket.send_json(response_payload)
+                    except (WebSocketDisconnect, RuntimeError) as send_err:
+                        logger.info("Client disconnected while sending JSON response. Exiting loop.")
+                        return
+            except Exception as exc:
+                logger.exception("Error processing frame: %s", exc)
+                try:
+                    await websocket.close(code=1011, reason="Internal processing error")
+                except Exception:
+                    pass
+                return
+
+    except WebSocketDisconnect:
+        logger.info("WebSocket disconnected by client")
+    except Exception as exc:
+        logger.exception("WebSocket connection error: %s", exc)
+        try:
+            await websocket.close(code=1011, reason=str(exc))
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":

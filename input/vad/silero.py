@@ -33,10 +33,11 @@ class SileroVAD(VoiceActivityDetector):
         # Load the ONNX model wrapper with onnx=True to use the ONNX runtime.
         # This is a synchronous one-time CPU-bound load (~330ms).
         self._model = load_silero_vad(onnx=True)
+        self._buffer = np.array([], dtype=np.float32)
 
     async def detect(self, frame: AudioFrame) -> VADResult:
         """
-        Detect speech in a single AudioFrame.
+        Detect speech in an AudioFrame of arbitrary size by buffering and chunking.
 
         Args:
             frame: Canonical AudioFrame containing float32 mono PCM samples at 16kHz.
@@ -50,21 +51,36 @@ class SileroVAD(VoiceActivityDetector):
                 "Ensure AudioFrameAdapter is used to normalize the audio stream."
             )
 
-        if frame.samples.shape[0] != _REQUIRED_SAMPLES:
-            raise ValueError(
-                f"SileroVAD expects exactly {_REQUIRED_SAMPLES} samples per frame (32ms at 16kHz), "
-                f"but received {frame.samples.shape[0]} samples. Adjust frame duration at the source layer."
+        # Accumulate new samples
+        self._buffer = np.concatenate([self._buffer, frame.samples])
+
+        if len(self._buffer) < _REQUIRED_SAMPLES:
+            return VADResult(
+                is_speech=False,
+                confidence=0.0,
+                timestamp=frame.timestamp,
             )
+
+        is_speech = False
+        max_confidence = 0.0
 
         # Offload the inference execution to the event loop's default thread pool
         # to avoid blocking the event loop on CPU-bound operations.
         loop = asyncio.get_running_loop()
-        confidence = await loop.run_in_executor(None, self._run_inference, frame.samples)
-        is_speech = confidence >= self.threshold
+        
+        while len(self._buffer) >= _REQUIRED_SAMPLES:
+            chunk = self._buffer[:_REQUIRED_SAMPLES]
+            self._buffer = self._buffer[_REQUIRED_SAMPLES:]
+
+            confidence = await loop.run_in_executor(None, self._run_inference, chunk)
+            if confidence >= self.threshold:
+                is_speech = True
+            if confidence > max_confidence:
+                max_confidence = confidence
 
         return VADResult(
             is_speech=is_speech,
-            confidence=confidence,
+            confidence=max_confidence,
             timestamp=frame.timestamp,
         )
 
@@ -78,7 +94,8 @@ class SileroVAD(VoiceActivityDetector):
 
     def reset(self) -> None:
         """
-        Reset the recurrent state of the Silero ONNX model.
+        Reset the recurrent state of the Silero ONNX model and clear buffer.
         Should be called at the start of a new audio/conversation session.
         """
         self._model.reset_states()
+        self._buffer = np.array([], dtype=np.float32)

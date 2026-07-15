@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice AI WebSocket Test Client</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Voice AI Test Client</h1>
+            <p class="subtitle">Persistent WebSocket Audio Streaming Tester</p>
+        </header>
+
+        <main class="grid">
+            <section class="card control-panel">
+                <h2>Connection & Control</h2>
+                
+                <div class="status-container">
+                    <div class="status-item">
+                        <span class="status-label">WebSocket:</span>
+                        <span id="ws-status" class="status-badge disconnected">Disconnected</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Microphone:</span>
+                        <span id="mic-status" class="status-badge inactive">Inactive</span>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="ws-url">WebSocket URL</label>
+                    <input type="text" id="ws-url" value="ws://127.0.0.1:8000/ws/audio" placeholder="ws://...">
+                </div>
+
+                <div class="button-group">
+                    <button id="btn-connect" class="btn btn-primary">Connect</button>
+                    <button id="btn-disconnect" class="btn btn-danger" disabled>Disconnect</button>
+                </div>
+
+                <hr class="separator">
+
+                <div class="button-group">
+                    <button id="btn-start" class="btn btn-success" disabled>Start Recording</button>
+                    <button id="btn-stop" class="btn btn-warning" disabled>Stop Recording</button>
+                </div>
+            </section>
+
+            <section class="card log-panel">
+                <div class="log-header">
+                    <h2>Event Logs</h2>
+                    <button id="btn-clear" class="btn btn-secondary btn-sm">Clear Logs</button>
+                </div>
+                <div id="log-area" class="log-area">
+                    <div class="log-entry system">System initialized. Ready to connect.</div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
