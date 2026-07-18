@@ -28,7 +28,7 @@ btnClear.addEventListener('click', clearLogs);
 function log(message, type = 'system') {
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
-    
+
     if (type === 'json') {
         try {
             const parsed = JSON.parse(message);
@@ -40,7 +40,7 @@ function log(message, type = 'system') {
         const time = new Date().toLocaleTimeString();
         entry.textContent = `[${time}] ${message}`;
     }
-    
+
     logArea.appendChild(entry);
     logArea.scrollTop = logArea.scrollHeight;
 }
@@ -73,7 +73,7 @@ async function connect() {
     const sampleRate = audioContext.sampleRate;
     // Append parameters: using native sample rate, 1 channel, and float32 format
     const fullUrl = `${url}?sample_rate=${sampleRate}&channels=1&format=float32`;
-    
+
     log(`Connecting to ${fullUrl}...`);
     btnConnect.disabled = true;
     wsStatus.textContent = 'Connecting...';
@@ -131,7 +131,7 @@ function handleDisconnectCleanup() {
     btnStart.disabled = true;
     btnStop.disabled = true;
     wsUrlInput.disabled = false;
-    
+
     if (isRecording) {
         stopRecording();
     }
@@ -147,13 +147,13 @@ async function startRecording() {
     log('Requesting microphone access...');
     try {
         stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-            channelCount: 1,
-            echoCancellation: false,
-            noiseSuppression: false,
-            autoGainControl: false
-        }
-    });
+            audio: {
+                channelCount: 1,
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false
+            }
+        });
     } catch (err) {
         log(`Microphone permission denied or unavailable: ${err.message}`, 'error');
         return;
@@ -170,10 +170,10 @@ async function startRecording() {
     try {
         await audioContext.resume();
         sourceNode = audioContext.createMediaStreamSource(stream);
-        
+
         // Setup ScriptProcessorNode with buffer size of 2048, 1 input channel, 1 output channel
         processorNode = audioContext.createScriptProcessor(2048, 1, 1);
-        
+
         processorNode.onaudioprocess = (e) => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 const inputData = e.inputBuffer.getChannelData(0); // float32 array
@@ -186,7 +186,7 @@ async function startRecording() {
         sourceNode.connect(processorNode);
         processorNode.connect(audioContext.destination);
         log('Recording started. Streaming audio frames to backend...', 'success');
-        
+
     } catch (err) {
         log(`Failed to initialize audio processing pipeline: ${err.message}`, 'error');
         stopRecording();

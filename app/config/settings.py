@@ -54,6 +54,14 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "qwen3:1.7b"
     LLM_TIMEOUT: float = 180.0
 
+    # ==========================
+    # Silma Text-to-Speech (TTS)
+    # ==========================
+    SILMA_API_KEY: str
+    SILMA_BASE_URL: str
+    SILMA_MODEL_ID: str
+    SILMA_VOICE_ID: str
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -5,13 +5,14 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
 
 from app.config.settings import settings
 from app.db.postgres import check_postgres
 from app.db.qdrant import check_qdrant
 from app.db.redis import check_redis
 from llm.check import check_llm
+from app.tts.check import check_tts
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -49,6 +50,12 @@ async def lifespan(app: FastAPI):
         logger.error("LLM connection failed: %s", exc)
         raise
 
+    try:
+        await check_tts()
+    except Exception as exc:
+        logger.error("TTS connection failed: %s", exc)
+        raise
+
     logger.info("%s is ready.", settings.PROJECT_NAME)
 
     yield  # application runs here
@@ -63,6 +70,14 @@ async def lifespan(app: FastAPI):
             await _llm_cache.close()
         except Exception as exc:
             logger.error("Failed to close LLM cache: %s", exc)
+
+    global _tts_cache
+    if _tts_cache is not None:
+        try:
+            logger.info("Closing TTS cache...")
+            await _tts_cache.close()
+        except Exception as exc:
+            logger.error("Failed to close TTS cache: %s", exc)
 
 
 app = FastAPI(
@@ -108,6 +123,7 @@ class DemoOrchestratorResponse(BaseModel):
 
 _recognizer_cache = None
 _llm_cache = None
+_tts_cache = None
 
 @app.post("/demo/stt", response_model=TranscriptionResponse)
 async def demo_stt():
@@ -170,7 +186,7 @@ async def demo_stt():
     )
 
 
-@app.post("/demo/orchestrator", response_model=DemoOrchestratorResponse)
+@app.post("/demo/orchestrator")
 async def demo_orchestrator():
     import sys
     if hasattr(sys.stdout, "reconfigure"):
@@ -186,7 +202,7 @@ async def demo_orchestrator():
     from orchestration.orchestrator import Orchestrator
     from llm.ollama import OllamaLanguageModel
 
-    global _recognizer_cache, _llm_cache
+    global _recognizer_cache, _llm_cache, _tts_cache
 
     if _recognizer_cache is None:
         _recognizer_cache = FasterWhisperSTT()
@@ -198,12 +214,17 @@ async def demo_orchestrator():
         await _llm_cache.initialize()
     llm = _llm_cache
 
+    if _tts_cache is None:
+        from app.tts import SilmaTTS
+        _tts_cache = SilmaTTS()
+    tts = _tts_cache
+
     source = MicrophoneSource(frame_duration_ms=32)
     adapter = AudioFrameAdapter()
     vad = SileroVAD(threshold=0.5)
     buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
 
-    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer, llm)
+    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer, llm, tts)
 
     logger.info("Orchestrator Started")
     logger.info("Listening...")
@@ -227,16 +248,22 @@ async def demo_orchestrator():
     )
     logger.info("Total pipeline completed in %.2f seconds", pipeline_elapsed)
 
-    return DemoOrchestratorResponse(
-        transcription=result.transcription.text,
-        language=result.transcription.language,
-        response=LLMStructuredResponse(
-            action=result.response.action,
-            department=result.response.department,
-            reason=result.response.reason,
-            message=result.response.message
-        )
-    )
+    # Synthesize the assistant's response to audio
+    try:
+        audio_bytes = await tts.synthesize(result.response.message)
+    except ValueError as exc:
+        logger.error("TTS input validation failed: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        logger.exception("TTS synthesis failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"TTS synthesis failed: {exc}")
+
+    # Temporary debugging logs
+    logger.info("Returned audio first 44 bytes: %s", audio_bytes[:44])
+    logger.info("Returned audio length: %d", len(audio_bytes))
+    logger.info("Response media type: audio/wav")
+
+    return Response(content=audio_bytes, media_type="audio/wav")
 
 
 @app.websocket("/ws/audio")
@@ -260,7 +287,7 @@ async def websocket_audio(
     import time
     import asyncio
 
-    global _recognizer_cache, _llm_cache
+    global _recognizer_cache, _llm_cache, _tts_cache
 
     if _recognizer_cache is None:
         _recognizer_cache = FasterWhisperSTT()
@@ -272,12 +299,17 @@ async def websocket_audio(
         await _llm_cache.initialize()
     llm = _llm_cache
 
+    if _tts_cache is None:
+        from app.tts import SilmaTTS
+        _tts_cache = SilmaTTS()
+    tts = _tts_cache
+
     adapter = AudioFrameAdapter()
     vad = SileroVAD(threshold=0.5)
     buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
     
     # Instantiate Orchestrator (without audio_source for WebSocket streaming)
-    orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm)
+    orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm, tts)
 
     # Bounded queue of size 3 for completed speech segments
     queue = asyncio.Queue(maxsize=3)

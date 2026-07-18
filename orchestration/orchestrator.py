@@ -11,6 +11,7 @@ from input.models.speech_segment import SpeechSegment
 from input.models.transcription import Transcription
 from llm.base import LanguageModel
 from llm.models import AIResponse
+from app.tts import SpeechSynthesizer
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class Orchestrator:
         buffer: SpeechBuffer,
         recognizer: SpeechRecognizer,
         llm: LanguageModel,
+        tts: SpeechSynthesizer,
     ) -> None:
         self.audio_source = audio_source
         self.adapter = adapter
@@ -43,6 +45,7 @@ class Orchestrator:
         self.buffer = buffer
         self.recognizer = recognizer
         self.llm = llm
+        self.tts = tts
 
     async def receive_audio_frame(self, frame: AudioFrame) -> Optional[SpeechSegment]:
         """
