@@ -102,9 +102,33 @@ async function connect() {
             console.error('WebSocket Error:', err);
         };
 
-        ws.onmessage = (event) => {
-            log('Received message from server:', 'system');
-            log(event.data, 'json');
+        ws.onmessage = async (event) => {
+            if (typeof event.data === 'string') {
+                log('Received message from server:', 'system');
+                log(event.data, 'json');
+            } else if (event.data instanceof Blob || event.data instanceof ArrayBuffer) {
+                log(`Received binary audio frame: ${event.data.size || event.data.byteLength} bytes.`, 'success');
+                try {
+                    let arrayBuffer;
+                    if (event.data instanceof Blob) {
+                        arrayBuffer = await event.data.arrayBuffer();
+                    } else {
+                        arrayBuffer = event.data;
+                    }
+                    if (audioContext) {
+                        log('Playing synthesized audio response...', 'success');
+                        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                        const source = audioContext.createBufferSource();
+                        source.buffer = audioBuffer;
+                        source.connect(audioContext.destination);
+                        source.start(0);
+                    }
+                } catch (err) {
+                    log(`Failed to play received audio: ${err.message}`, 'error');
+                }
+            } else {
+                log('Received unknown message type from server.', 'warning');
+            }
         };
 
     } catch (err) {

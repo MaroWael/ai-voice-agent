@@ -266,6 +266,23 @@ async def demo_orchestrator():
     return Response(content=audio_bytes, media_type="audio/wav")
 
 
+async def _synthesize_tts_helper(tts, text: str) -> bytes:
+    """
+    Helper function to perform TTS synthesis with logging.
+    """
+    logger.info("TTS started")
+    try:
+        audio_bytes = await tts.synthesize(text)
+        logger.info("TTS completed")
+        return audio_bytes
+    except ValueError as exc:
+        logger.error("TTS input validation failed: %s", exc)
+        raise
+    except Exception as exc:
+        logger.exception("TTS synthesis failed: %s", exc)
+        raise
+
+
 @app.websocket("/ws/audio")
 async def websocket_audio(
     websocket: WebSocket,
@@ -321,7 +338,12 @@ async def websocket_audio(
                 segment = await queue.get()
                 try:
                     result = await orchestrator.process_speech_segment(segment)
+                    
+                    # Generate TTS using the shared helper
+                    audio_bytes = await _synthesize_tts_helper(tts, result.response.message)
+                    
                     response_payload = {
+                        "type": "assistant_response",
                         "transcription": result.transcription.text,
                         "language": result.transcription.language,
                         "response": {
@@ -335,6 +357,14 @@ async def websocket_audio(
                         await websocket.send_json(response_payload)
                     except (WebSocketDisconnect, RuntimeError) as send_err:
                         logger.info("Client disconnected while sending JSON response. Worker exiting.")
+                        return
+                    
+                    logger.info("Sending audio")
+                    try:
+                        await websocket.send_bytes(audio_bytes)
+                        logger.info("Audio sent successfully")
+                    except (WebSocketDisconnect, RuntimeError) as send_err:
+                        logger.info("Client disconnected while sending audio bytes. Worker exiting.")
                         return
                 except Exception as exc:
                     logger.exception("Error during background speech processing: %s", exc)
