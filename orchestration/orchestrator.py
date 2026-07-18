@@ -70,7 +70,14 @@ class Orchestrator:
         logger.info("STT completed in %.2f seconds", stt_elapsed)
 
         start_llm = time.perf_counter()
+        logger.info("=== STT OUTPUT ===")
+        logger.info("Text: %s", transcription.text)
+        logger.info("Language: %s", transcription.language)
+        logger.info("==================")
         response = await self.llm.generate(transcription)
+        logger.info("=== LLM OUTPUT ===")
+        logger.info(response)
+        logger.info("==================")
         llm_elapsed = time.perf_counter() - start_llm
         logger.info("LLM completed in %.2f seconds", llm_elapsed)
 

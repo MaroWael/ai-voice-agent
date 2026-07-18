@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional
 import numpy as np
 from faster_whisper import WhisperModel
@@ -7,6 +8,8 @@ from app.config.settings import settings
 from input.models.speech_segment import SpeechSegment
 from input.models.transcription import Transcription
 from input.stt.base import SpeechRecognizer
+
+logger = logging.getLogger(__name__)
 
 
 class FasterWhisperSTT(SpeechRecognizer):
@@ -70,11 +73,13 @@ class FasterWhisperSTT(SpeechRecognizer):
 
     def _run_transcription(self, samples: np.ndarray) -> tuple[str, Optional[str]]:
         segments, info = self._model.transcribe(
-        samples,
-        beam_size=self.beam_size,
-        vad_filter=False,
-        condition_on_previous_text=False,
-    )
+            samples,
+            beam_size=self.beam_size,
+            vad_filter=False,
+            condition_on_previous_text=False,
+        )
+        logger.info("info.language: %s", info.language)
+        logger.info("info.language_probability: %s", info.language_probability)
 
         # Consolidate segments joining with spaces to prevent word merges
         text = " ".join(seg.text.strip() for seg in segments).strip()
