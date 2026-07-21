@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     SILMA_MODEL_ID: str
     SILMA_VOICE_ID: str
 
+    # ==========================
+    # Embeddings
+    # ==========================
+    # Model loaded via SentenceTransformer for multilingual semantic embeddings.
+    # Override in .env only when switching models.
+    EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    EMBEDDING_BATCH_SIZE: int = 32
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -31,6 +31,10 @@ from app.knowledge.validators.knowledge_validator import (
     KnowledgeValidator,
 )
 
+from app.config.settings import settings
+from app.embeddings.providers.sentence_transformer_provider import SentenceTransformerProvider
+from app.embeddings.services.embedding_service import EmbeddingService
+
 DATA_DIR = Path("data")
 
 SEARCH_QUERIES = [
@@ -92,6 +96,27 @@ async def run_searches(search_service: KnowledgeSearchService) -> None:
             print(f"      > {excerpt}{'...' if len(doc.content) > 120 else ''}")
 
 
+async def demo_embeddings(
+    repository: InMemoryKnowledgeRepository,
+    embedding_service: EmbeddingService,
+    provider: SentenceTransformerProvider,
+) -> None:
+    """Generate embeddings for all ingested documents and print a summary."""
+    print(f"\n{'-' * 60}")
+    print("  EMBEDDINGS")
+    print(f"{'-' * 60}")
+
+    documents = await repository.list_all()
+    embedded = await embedding_service.embed_documents(documents)
+
+    dimension = len(embedded[0].embedding) if embedded else 0
+
+    print(f"\n  Loaded model      : {provider.model_name}")
+    print(f"  Documents         : {len(documents)}")
+    print(f"  Embedding dimension: {dimension}")
+    print(f"  Embeddings generated: {len(embedded)}")
+
+
 async def demo_document_inspection(repository: InMemoryKnowledgeRepository) -> None:
     """Inspect a single document to show raw vs. normalized content."""
     print(f"\n{'-' * 60}")
@@ -127,12 +152,20 @@ async def main() -> None:
     repository = InMemoryKnowledgeRepository()
     search_service = KnowledgeSearchService(repository, LexicalSearch())
 
+    provider = SentenceTransformerProvider(
+        model_name=settings.EMBEDDING_MODEL,
+        batch_size=settings.EMBEDDING_BATCH_SIZE,
+    )
+    embedding_service = EmbeddingService(provider)
+
     await ingest(loader, validator, extractor, repository)
     await run_searches(search_service)
     await demo_document_inspection(repository)
+    await demo_embeddings(repository, embedding_service, provider)
 
     print(f"\n{'-' * 60}\n")
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+    print("END OF MAIN")
