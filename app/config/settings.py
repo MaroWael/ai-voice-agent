@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     # ==========================
     QDRANT_HOST: str
     QDRANT_HTTP_PORT: int
+    QDRANT_COLLECTION_NAME: str = "knowledge_base"
+    QDRANT_DISTANCE_METRIC: str = "Cosine"
+    QDRANT_BATCH_SIZE: int = 64
 
     # ==========================
     # Audio Pipeline

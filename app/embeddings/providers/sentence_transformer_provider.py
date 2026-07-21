@@ -40,6 +40,12 @@ class SentenceTransformerProvider:
         """True if the model has been loaded into memory."""
         return self._model is not None
 
+    @property
+    def dimension(self) -> int:
+        """The output vector dimension of the embedding model."""
+        model = self._get_model()
+        return model.get_sentence_embedding_dimension()
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         """
         Generate embeddings for a batch of texts.

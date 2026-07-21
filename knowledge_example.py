@@ -32,6 +32,7 @@ from app.knowledge.validators.knowledge_validator import (
 )
 
 from app.config.settings import settings
+from app.embeddings.models.embedded_document import EmbeddedDocument
 from app.embeddings.providers.sentence_transformer_provider import SentenceTransformerProvider
 from app.embeddings.services.embedding_service import EmbeddingService
 
@@ -100,7 +101,7 @@ async def demo_embeddings(
     repository: InMemoryKnowledgeRepository,
     embedding_service: EmbeddingService,
     provider: SentenceTransformerProvider,
-) -> None:
+) -> tuple[list[EmbeddedDocument], int]:
     """Generate embeddings for all ingested documents and print a summary."""
     print(f"\n{'-' * 60}")
     print("  EMBEDDINGS")
@@ -108,13 +109,42 @@ async def demo_embeddings(
 
     documents = await repository.list_all()
     embedded = await embedding_service.embed_documents(documents)
-
-    dimension = len(embedded[0].embedding) if embedded else 0
+    dimension = provider.dimension
 
     print(f"\n  Loaded model      : {provider.model_name}")
     print(f"  Documents         : {len(documents)}")
     print(f"  Embedding dimension: {dimension}")
     print(f"  Embeddings generated: {len(embedded)}")
+    return embedded, dimension
+
+
+async def demo_qdrant_indexing(
+    embedded_docs: list[EmbeddedDocument],
+    vector_dimension: int,
+) -> None:
+    """Index all embedded documents into Qdrant vector store and print summary."""
+    print(f"\n{'-' * 60}")
+    print("  QDRANT VECTOR INDEXING")
+    print(f"{'-' * 60}")
+
+    from app.db.qdrant import get_qdrant
+    from app.vector_store.providers.qdrant_provider import QdrantProvider
+    from app.vector_store.services.qdrant_indexer import QdrantIndexer
+
+    client = get_qdrant()
+    vector_provider = QdrantProvider(client)
+    indexer = QdrantIndexer(
+        provider=vector_provider,
+        collection_name=settings.QDRANT_COLLECTION_NAME,
+        batch_size=settings.QDRANT_BATCH_SIZE,
+    )
+
+    indexed_count = await indexer.index_documents(embedded_docs, vector_dimension)
+
+    print(f"\n  Qdrant Collection : {settings.QDRANT_COLLECTION_NAME}")
+    print(f"  Vector Size       : {vector_dimension}")
+    print(f"  Batch Size        : {settings.QDRANT_BATCH_SIZE}")
+    print(f"  Indexed Points    : {indexed_count}")
 
 
 async def demo_document_inspection(repository: InMemoryKnowledgeRepository) -> None:
@@ -161,7 +191,8 @@ async def main() -> None:
     await ingest(loader, validator, extractor, repository)
     await run_searches(search_service)
     await demo_document_inspection(repository)
-    await demo_embeddings(repository, embedding_service, provider)
+    embedded_docs, dimension = await demo_embeddings(repository, embedding_service, provider)
+    await demo_qdrant_indexing(embedded_docs, dimension)
 
     print(f"\n{'-' * 60}\n")
 

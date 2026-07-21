@@ -16,6 +16,11 @@ class EmbeddingProvider(Protocol):
     - Be safe to call from an async context (via asyncio.to_thread).
     """
 
+    @property
+    def dimension(self) -> int:
+        """The output vector dimension of the embedding model."""
+        ...
+
     def embed(self, texts: list[str]) -> list[list[float]]:
         """
         Generate embeddings for a batch of texts.
