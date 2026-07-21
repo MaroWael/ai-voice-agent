@@ -1,0 +1,41 @@
+{
+  "name": "Card from Banque Misr secured against any other credit card",
+  "url": "https://www.banquemisr.com/Home/SMEs/Retail Banking/Pages/Cards/Credit Cards List/Card to Card",
+  "description": "Do you have a credit card from another bank? Now you can benefit more with a credit card from Bank Misr. Without needing to transfer your salary or tie up a certificate/deposit, you can get a card with a credit limit of up to 120% of your current car",
+  "full_text": "Card from Banque Misr secured against any other credit card\n\n\n--- Benefits ---\n\nDo you have a credit card from another bank? Now you can benefit more with a credit card from Bank Misr. Without needing to transfer your salary or tie up a certificate/deposit, you can get a card with a credit limit of up to 120% of your current card.\n\n\n--- Documents Required from the Customer ---\n\nFor Business Customers:\n\nProgram Specifications\n\nTo apply for a credit card issuance, please visit:\n\n• A clear copy of the valid national ID card along with a recent utility bill receipt.\n• Signed request form for issuance.\n• Commercial registration or professional license.\n• Tax card.\n• Customers who possess unsecured credit cards from other banks with a minimum limit of 20,000 EGP.\n• The other bank's credit card must be used at least 10% of its credit limit.\n• We offer a new credit card to the customer with a maximum limit of up to 120% of the other bank’s credit limit.\n• The maximum credit limit on our credit cards is 250,000 EGP.\n• Age requirement: 21 to 60 years.",
+  "sections": [
+    {
+      "title": "Benefits",
+      "content": "Do you have a credit card from another bank? Now you can benefit more with a credit card from Bank Misr. Without needing to transfer your salary or tie up a certificate/deposit, you can get a card with a credit limit of up to 120% of your current card.",
+      "bullets": [],
+      "tables": []
+    },
+    {
+      "title": "Documents Required from the Customer",
+      "content": "For Business Customers:\n\nProgram Specifications\n\nTo apply for a credit card issuance, please visit:",
+      "bullets": [
+        "A clear copy of the valid national ID card along with a recent utility bill receipt.",
+        "Signed request form for issuance.",
+        "Commercial registration or professional license.",
+        "Tax card.",
+        "Customers who possess unsecured credit cards from other banks with a minimum limit of 20,000 EGP.",
+        "The other bank's credit card must be used at least 10% of its credit limit.",
+        "We offer a new credit card to the customer with a maximum limit of up to 120% of the other bank’s credit limit.",
+        "The maximum credit limit on our credit cards is 250,000 EGP.",
+        "Age requirement: 21 to 60 years."
+      ],
+      "tables": []
+    }
+  ],
+  "images": [
+    {
+      "url": "https://www.banquemisr.com/-/media/Landing-Pages/card2card_ENG.ashx",
+      "local_path": "output/images/card2card_ENG.ashx"
+    },
+    {
+      "url": "https://www.banquemisr.com/-/media/apply-en-cre.ashx",
+      "local_path": "output/images/apply-en-cre.ashx"
+    }
+  ],
+  "pdfs": []
+}

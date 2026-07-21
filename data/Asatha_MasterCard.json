@@ -1,0 +1,136 @@
+{
+  "name": "Asatha MasterCard",
+  "url": "https://www.banquemisr.com/Home/SMEs/Retail Banking/Pages/Cards/Credit Cards Pages/Asatha Card",
+  "description": "Card can be issued with in-kind warranty or personal guarantee.",
+  "full_text": "Asatha MasterCard\n\n\n--- Benefits ---\n\n• Card can be issued with in-kind warranty or personal guarantee.\n• Card can be issued with assets or cash guarantees.\n• Card is usable for local and international transactions and repayment is in Egyptian pounds.\n• Multiple supplementary cards can be issued.\n• Card can be used for online transactions.\n• Long grace period at up to 57 days\n• Card debit can be repaid through any Banque Misr cash deposit ATMs.\n• Card transactions can be paid at any Banque Misr branch across Egypt, every day 24 hours a day at Banque Misr branches located at airports and hotels.\n• Promotions and discounts at luxury shopping centers in Egypt and abroad, as specified in the MasterCard Buy 1 Get 1 application\n• Free SMS service after each card transaction in addition and a free monthly statement outlining all debit transactions and payments due on the card, as well as issuance and renewal fees.\n• Purchasing using Contactless technology to make your shopping safe, fast and easy\n• Installment payment for card purchases over up to 36 months with a special interest rate according to the customer's choice.\n\n\n--- Usage limits ---\n\nUsage limits | Details\nLocal and international purchases | Within the card credit limits with Maximum 400000 EGP per Month with a limit of 8 times daily\nContactless purchase limit without pin inside Egypt | 600 EGP per transaction with maximum 15 consecutive transaction\nContactless purchase limit without pin outside Egypt | Equivalent to 1500 EGP per transaction with maximum 15 consecutive Transaction\nLocal purchase transactions | Within the card credit limits\nInternational purchase transactions (In case the customer has informed the bank of the travel) | 100 $ Monthly\n\n\n--- Fees and charges ---\n\nFees and charges | Details\nIssuance | EGP 150\nRenewal | EGP 75\nSupplementary cards issuance and renewal | EGP 50\nReplacement of lost/damaged cards | EGP 75\nBalance inquiry via Banque Misr ATMs | Free\nBalance inquiry via other ATMs inside Egypt | EGP 1 per transaction\nBalance inquiry via ATMs outside Egypt | EGP 3 per transaction\nInterest rate | 3% Monthly ( Decreasing)\nLate fee | EGP 75\nExceeding credit limit fee | EGP 75\nTransactions outside Egypt (purchases) | 10% of transaction value\nPenalty for unjustified disputes over transactions (via fax, email, post, call center) | EGP 50\nPrinted certified transaction statement, starting from the following month | EGP 20\nRequesting clearance letter, certificate of indebtedness or to whom it may concern letter | EGP 50",
+  "sections": [
+    {
+      "title": "Benefits",
+      "content": "",
+      "bullets": [
+        "Card can be issued with in-kind warranty or personal guarantee.",
+        "Card can be issued with assets or cash guarantees.",
+        "Card is usable for local and international transactions and repayment is in Egyptian pounds.",
+        "Multiple supplementary cards can be issued.",
+        "Card can be used for online transactions.",
+        "Long grace period at up to 57 days",
+        "Card debit can be repaid through any Banque Misr cash deposit ATMs.",
+        "Card transactions can be paid at any Banque Misr branch across Egypt, every day 24 hours a day at Banque Misr branches located at airports and hotels.",
+        "Promotions and discounts at luxury shopping centers in Egypt and abroad, as specified in the MasterCard Buy 1 Get 1 application",
+        "Free SMS service after each card transaction in addition and a free monthly statement outlining all debit transactions and payments due on the card, as well as issuance and renewal fees.",
+        "Purchasing using Contactless technology to make your shopping safe, fast and easy",
+        "Installment payment for card purchases over up to 36 months with a special interest rate according to the customer's choice."
+      ],
+      "tables": []
+    },
+    {
+      "title": "Usage limits",
+      "content": "",
+      "bullets": [],
+      "tables": [
+        [
+          [
+            "Usage limits",
+            "Details"
+          ],
+          [
+            "Local and international purchases",
+            "Within the card credit limits with Maximum 400000 EGP per Month with a limit of 8 times daily"
+          ],
+          [
+            "Contactless purchase limit without pin inside Egypt",
+            "600 EGP per transaction with maximum 15 consecutive transaction"
+          ],
+          [
+            "Contactless purchase limit without pin outside Egypt",
+            "Equivalent to 1500 EGP per transaction with maximum 15 consecutive Transaction"
+          ],
+          [
+            "Local purchase transactions",
+            "Within the card credit limits"
+          ],
+          [
+            "International purchase transactions (In case the customer has informed the bank of the travel)",
+            "100 $ Monthly"
+          ]
+        ]
+      ]
+    },
+    {
+      "title": "Fees and charges",
+      "content": "",
+      "bullets": [],
+      "tables": [
+        [
+          [
+            "Fees and charges",
+            "Details"
+          ],
+          [
+            "Issuance",
+            "EGP 150"
+          ],
+          [
+            "Renewal",
+            "EGP 75"
+          ],
+          [
+            "Supplementary cards issuance and renewal",
+            "EGP 50"
+          ],
+          [
+            "Replacement of lost/damaged cards",
+            "EGP 75"
+          ],
+          [
+            "Balance inquiry via Banque Misr ATMs",
+            "Free"
+          ],
+          [
+            "Balance inquiry via other ATMs inside Egypt",
+            "EGP 1 per transaction"
+          ],
+          [
+            "Balance inquiry via ATMs outside Egypt",
+            "EGP 3 per transaction"
+          ],
+          [
+            "Interest rate",
+            "3% Monthly ( Decreasing)"
+          ],
+          [
+            "Late fee",
+            "EGP 75"
+          ],
+          [
+            "Exceeding credit limit fee",
+            "EGP 75"
+          ],
+          [
+            "Transactions outside Egypt (purchases)",
+            "10% of transaction value"
+          ],
+          [
+            "Penalty for unjustified disputes over transactions (via fax, email, post, call center)",
+            "EGP 50"
+          ],
+          [
+            "Printed certified transaction statement, starting from the following month",
+            "EGP 20"
+          ],
+          [
+            "Requesting clearance letter, certificate of indebtedness or to whom it may concern letter",
+            "EGP 50"
+          ]
+        ]
+      ]
+    }
+  ],
+  "images": [
+    {
+      "url": "https://www.banquemisr.com/-/media/Cards/Credit/Kasatha-MasterCard.ashx?h=146&w=225&hash=EBEF1765EBEA664262A12DC2ABBDA6DC",
+      "local_path": "output/images/Kasatha-MasterCard.ashx"
+    }
+  ],
+  "pdfs": []
+}

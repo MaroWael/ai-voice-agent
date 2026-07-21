@@ -1,0 +1,138 @@
+"""
+End-to-end demonstration of the Knowledge Engine ingestion pipeline.
+
+Pipeline:
+    JSON files in data/
+        → JsonKnowledgeLoader   (parse raw JSON)
+        → KnowledgeValidator    (enforce business rules)
+        → SectionExtractor      (+ KnowledgeNormalizer internally)
+        → InMemoryKnowledgeRepository
+        → KnowledgeSearchService (lexical search)
+
+Run with:
+    python knowledge_example.py
+"""
+
+import asyncio
+import sys
+from pathlib import Path
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from app.knowledge.extractors.section_extractor import SectionExtractor
+from app.knowledge.loaders.json_loader import JsonKnowledgeLoader
+from app.knowledge.normalizers.knowledge_normalizer import KnowledgeNormalizer
+from app.knowledge.repository.in_memory_repository import InMemoryKnowledgeRepository
+from app.knowledge.search.knowledge_search_service import KnowledgeSearchService
+from app.knowledge.search.lexical_search import LexicalSearch
+from app.knowledge.validators.knowledge_validator import (
+    KnowledgeValidationError,
+    KnowledgeValidator,
+)
+
+DATA_DIR = Path("data")
+
+SEARCH_QUERIES = [
+    "installment",
+    "lounge access",
+    "credit limit fees",
+    "cash withdrawal",
+    "supplementary card",
+]
+
+
+async def ingest(
+    loader: JsonKnowledgeLoader,
+    validator: KnowledgeValidator,
+    extractor: SectionExtractor,
+    repository: InMemoryKnowledgeRepository,
+) -> tuple[int, int]:
+    """Load, validate, extract, and store all documents. Returns (stored, skipped)."""
+    print(f"\n{'-' * 60}")
+    print(f"  INGESTION  --  source: {DATA_DIR.resolve()}")
+    print(f"{'-' * 60}")
+
+    raw_documents = await loader.load_directory(DATA_DIR)
+    print(f"  Loaded {len(raw_documents)} JSON file(s).\n")
+
+    stored = 0
+    skipped = 0
+
+    for raw_doc in raw_documents:
+        try:
+            validator.validate(raw_doc)
+        except KnowledgeValidationError as exc:
+            print(f"  [SKIP]  {exc}")
+            skipped += 1
+            continue
+
+        knowledge_docs = extractor.extract(raw_doc)
+        await repository.save_many(knowledge_docs)
+        stored += len(knowledge_docs)
+        print(f"  [OK]    {raw_doc.name!r:45s}  ->  {len(knowledge_docs)} section(s)")
+
+    print(f"\n  Ingestion complete: {stored} section(s) stored, {skipped} skipped.")
+    return stored, skipped
+
+
+async def run_searches(search_service: KnowledgeSearchService) -> None:
+    """Run a set of demo queries and print results."""
+    print(f"\n{'-' * 60}")
+    print("  SEARCH RESULTS")
+    print(f"{'-' * 60}")
+
+    for query in SEARCH_QUERIES:
+        results = await search_service.search(query)
+        print(f"\n  Query: '{query}'  ->  {len(results)} result(s)")
+        for doc in results[:5]:
+            print(f"    [{doc.metadata.product_name}]  {doc.title}")
+            # Show a short excerpt of the normalized content.
+            excerpt = doc.content[:120].replace("\n", " ")
+            print(f"      > {excerpt}{'...' if len(doc.content) > 120 else ''}")
+
+
+async def demo_document_inspection(repository: InMemoryKnowledgeRepository) -> None:
+    """Inspect a single document to show raw vs. normalized content."""
+    print(f"\n{'-' * 60}")
+    print("  DOCUMENT INSPECTION  --  raw_content vs. content")
+    print(f"{'-' * 60}")
+
+    all_docs = await repository.list_all()
+    # Pick a document with a table for a meaningful comparison.
+    table_doc = next(
+        (d for d in all_docs if "fees" in d.title.lower()),
+        all_docs[0] if all_docs else None,
+    )
+
+    if table_doc is None:
+        print("  No documents in repository.")
+        return
+
+    print(f"\n  Document ID  : {table_doc.id}")
+    print(f"  Product      : {table_doc.metadata.product_name}")
+    print(f"  Section      : {table_doc.title}")
+    print(f"\n  --- raw_content (first 300 chars) ---")
+    print(f"  {table_doc.raw_content[:300].replace(chr(10), chr(10) + '  ')}")
+    print(f"\n  --- content / normalized (first 300 chars) ---")
+    print(f"  {table_doc.content[:300].replace(chr(10), chr(10) + '  ')}")
+
+
+async def main() -> None:
+    # Wire up the pipeline via constructor injection.
+    loader = JsonKnowledgeLoader()
+    validator = KnowledgeValidator()
+    normalizer = KnowledgeNormalizer()
+    extractor = SectionExtractor(normalizer)
+    repository = InMemoryKnowledgeRepository()
+    search_service = KnowledgeSearchService(repository, LexicalSearch())
+
+    await ingest(loader, validator, extractor, repository)
+    await run_searches(search_service)
+    await demo_document_inspection(repository)
+
+    print(f"\n{'-' * 60}\n")
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
