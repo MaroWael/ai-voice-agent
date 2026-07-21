@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -72,6 +73,13 @@ class Settings(BaseSettings):
     # Override in .env only when switching models.
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
     EMBEDDING_BATCH_SIZE: int = 32
+
+    # ==========================
+    # Knowledge Base
+    # ==========================
+    # Directory containing the raw JSON knowledge files.
+    # Override in .env to point at a different data directory.
+    KNOWLEDGE_DATA_PATH: Path = Path("data")
 
     model_config = SettingsConfigDict(
         env_file=".env",

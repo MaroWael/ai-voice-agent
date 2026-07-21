@@ -92,3 +92,25 @@ class EmbeddingService:
             EmbeddedDocument(document=doc, embedding=vector)
             for doc, vector in zip(documents, vectors)
         ]
+
+    async def embed_query(self, text: str) -> list[float]:
+        """
+        Generate an embedding vector for a query string / user question.
+
+        Offloads the blocking provider call to a thread via asyncio.to_thread.
+
+        Args:
+            text: Non-empty query text string.
+
+        Returns:
+            A list of float values representing the query embedding vector.
+
+        Raises:
+            ValueError: If text is empty or whitespace-only.
+        """
+        if not text or not text.strip():
+            raise ValueError("text must not be empty.")
+
+        vectors = await asyncio.to_thread(self._provider.embed, [text])
+        return vectors[0]
+

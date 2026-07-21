@@ -1,5 +1,6 @@
 from typing import Protocol, runtime_checkable
 
+from app.retrieval.models.search_result import SearchResult
 from app.vector_store.models.vector_point import VectorPoint
 
 
@@ -34,3 +35,19 @@ class VectorStoreProvider(Protocol):
             points: Batch of VectorPoints to insert or update.
         """
         ...
+
+    async def search(
+        self, vector: list[float], top_k: int
+    ) -> list[SearchResult]:
+        """
+        Execute semantic vector search against the vector database.
+
+        Args:
+            vector: Query embedding float vector.
+            top_k: Number of top results to return.
+
+        Returns:
+            List of SearchResult objects ordered by relevance score descending.
+        """
+        ...
+
