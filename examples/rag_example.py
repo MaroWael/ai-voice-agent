@@ -73,7 +73,7 @@ async def main() -> None:
             print("Running pipeline...")
 
             # Run RAG answer pipeline (using top_k=3 for test case context brevity)
-            response = await rag_service.answer(question, top_k=3)
+            response = await rag_service.answer(question, top_k=10)
 
             print("\n>>> Generated Answer:")
             print(response.answer)
