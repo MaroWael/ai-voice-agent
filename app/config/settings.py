@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = "http://localhost:11434"
     LLM_MODEL: str = "qwen3:1.7b"
     LLM_TIMEOUT: float = 180.0
+    LLM_NUM_PREDICT: int = 150
+    LLM_TEMPERATURE: float = 0.1
+    LLM_TOP_P: float = 0.2
+    LLM_REPEAT_PENALTY: float = 1.1
+
 
     # ==========================
     # Silma Text-to-Speech (TTS)

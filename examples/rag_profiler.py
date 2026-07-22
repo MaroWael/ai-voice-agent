@@ -1,8 +1,8 @@
 """
 Voice AI RAG Profiler — Developer Inspection Tool
 
-Measures execution time (in milliseconds), stage percentages, and detailed LLM performance
-metrics for every stage of the RAG quality pipeline for a single user query.
+Measures execution time (in milliseconds), stage percentages, detailed LLM performance
+metrics, and token generation reduction for every stage of the RAG quality pipeline.
 
 Workflow:
     User Question
@@ -41,6 +41,34 @@ from app.rag.builders.prompt_builder import PromptBuilder
 from app.rag.providers.ollama_provider import OllamaRagProvider
 from app.rag.services.rag_service import _INSUFFICIENT_CONTEXT_MSG
 from app.unknown_detection.factory import build_unknown_detector
+
+
+def estimate_max_output_tokens(query: str) -> int:
+    """
+    Lightweight rule-based heuristic to dynamically estimate max output tokens (num_predict)
+    based on query type.
+    """
+    q = query.lower()
+
+    # Fact / Short Lookup queries -> small token limit (e.g. 80)
+    fact_keywords = [
+        "fee", "fees", "cost", "limit", "rate", "interest", "phone", "renewal", "issuance",
+        "رسوم", "مصاريف", "حد", "فائدة", "تجديد", "إصدار", "كام", "كم"
+    ]
+    if any(k in q for k in fact_keywords):
+        return 80
+
+    # Comparison / List queries -> medium token limit (e.g. 150)
+    list_keywords = [
+        "benefit", "benefits", "feature", "features", "requirement", "requirements",
+        "eligibility", "option", "options", "compare", "difference",
+        "مزايا", "شروط", "متطلبات", "فوائد", "فرق", "مقارنة", "أنواع"
+    ]
+    if any(k in q for k in list_keywords):
+        return 150
+
+    # Default / Complex queries -> standard max tokens (e.g. 250)
+    return 250
 
 
 async def _knowledge_base_ready() -> bool:
@@ -174,12 +202,13 @@ async def profile_query(
     print(f"\nTime:\n{context_time:.1f} ms")
 
     # ---------------------------------------------------------
-    # Stage 5: Prompt Builder
+    # Stage 5: Prompt Builder & Dynamic Token Limit Heuristic
     # ---------------------------------------------------------
     t0 = time.perf_counter()
     prompt = prompt_builder.build_prompt(query, context)
     prompt_time = (time.perf_counter() - t0) * 1000.0
 
+    expected_max_tokens = estimate_max_output_tokens(query)
     approx_prompt_tokens = len(prompt.split())
 
     print("\n---------------------------------------------------------")
@@ -194,7 +223,10 @@ async def profile_query(
     # ---------------------------------------------------------
     t0 = time.perf_counter()
     if hasattr(llm_provider, "generate_with_metadata"):
-        answer, metadata = await llm_provider.generate_with_metadata(prompt)
+        answer, metadata = await llm_provider.generate_with_metadata(
+            prompt,
+            num_predict=expected_max_tokens,
+        )
     else:
         answer = await llm_provider.generate(prompt)
         metadata = {}
@@ -225,11 +257,18 @@ async def profile_query(
     prompt_speed = (prompt_eval_count / (llm_prompt_proc_ms / 1000.0)) if llm_prompt_proc_ms > 0 else 0.0
     gen_speed = (eval_count / (llm_gen_ms / 1000.0)) if llm_gen_ms > 0 else 0.0
 
+    # Baseline unconstrained token ceiling was 512
+    unconstrained_baseline_tokens = 512
+    reduction_pct = max(0.0, ((unconstrained_baseline_tokens - eval_count) / unconstrained_baseline_tokens) * 100.0)
+
     print("\n---------------------------------------------------------")
     print("LLM PERFORMANCE")
     print("---------------------------------------------------------")
     print(f"\nPrompt Length:\n{len(prompt)} chars")
     print(f"\nPrompt Tokens:\n{prompt_eval_count}")
+    print(f"\nExpected Max Output Tokens:\n{expected_max_tokens}")
+    print(f"\nActual Generated Tokens:\n{eval_count}")
+    print(f"\nGeneration Reduction (%):\n{reduction_pct:.1f}%")
     print(f"\nAnswer Tokens:\n{eval_count}")
     print(f"\nPrompt Processing:\n{llm_prompt_proc_ms:.1f} ms")
     print(f"\nGeneration:\n{llm_gen_ms:.1f} ms")

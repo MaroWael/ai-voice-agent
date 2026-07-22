@@ -26,10 +26,16 @@ class OllamaRagProvider(LLMProvider):
             self._client = httpx.AsyncClient(base_url=self.base_url)
             logger.info("OllamaRagProvider initialized with base_url: %s", self.base_url)
 
-    async def generate_with_metadata(self, prompt: str) -> tuple[str, dict]:
+    async def generate_with_metadata(
+        self,
+        prompt: str,
+        num_predict: int | None = None,
+    ) -> tuple[str, dict]:
         """Sends the prompt to Ollama's /api/generate and returns (text_response, full_json_dict)."""
         if self._client is None:
             raise RuntimeError("OllamaRagProvider not initialized. Call initialize() first.")
+
+        n_predict = num_predict if num_predict is not None else settings.LLM_NUM_PREDICT
 
         payload = {
             "model": self.model_name,
@@ -38,8 +44,10 @@ class OllamaRagProvider(LLMProvider):
             "think": False,
             "keep_alive": "30m",
             "options": {
-                "temperature": 0.2,
-                "num_predict": 512,
+                "temperature": settings.LLM_TEMPERATURE,
+                "num_predict": n_predict,
+                "top_p": settings.LLM_TOP_P,
+                "repeat_penalty": settings.LLM_REPEAT_PENALTY,
             }
         }
 
