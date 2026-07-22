@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from app.rag.models.status import RagStatus
 from app.retrieval.models.search_result import SearchResult
 
 
@@ -8,11 +9,14 @@ class RagResponse(BaseModel):
     """
     model_config = ConfigDict(frozen=True)
 
-    # The generated text answer from the LLM.
+    # The generated text answer from the LLM (or the fallback message).
     answer: str
 
-    # The final prompt string sent to the LLM (for debugging and iteration).
+    # The final prompt string sent to the LLM (empty string on INSUFFICIENT_CONTEXT).
     prompt: str
 
-    # The list of SearchResults used to construct the context for this query.
+    # The list of SearchResults used (or evaluated) by this pipeline run.
     retrieved_documents: list[SearchResult]
+
+    # Categorical outcome of the pipeline run.
+    status: RagStatus = RagStatus.SUCCESS

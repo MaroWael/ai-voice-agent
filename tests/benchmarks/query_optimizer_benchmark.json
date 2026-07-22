@@ -1,0 +1,139 @@
+[
+  {
+    "id": "ar-fees-platinum",
+    "query": "كام رسوم البلاتينيوم؟",
+    "expected_product": "Platinum Visa Master Credit Card",
+    "expected_keywords": ["fees", "رسوم"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-fees-gold",
+    "query": "ايه رسوم بطاقة الجولد؟",
+    "expected_product": "Gold Credit Cards",
+    "expected_keywords": ["fees", "رسوم"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-benefits-platinum",
+    "query": "ايه هي مزايا البلاتينيوم؟",
+    "expected_product": "Platinum Visa Master Credit Card",
+    "expected_keywords": ["benefits", "مزايا"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-credit-limit-classic",
+    "query": "الحد الائتماني للكلاسيك كام؟",
+    "expected_product": "Classic Credit Card",
+    "expected_keywords": ["credit limit", "حد الائتمان"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-installments-titanium",
+    "query": "ايه خطط التقسيط على بطاقة التيتانيوم؟",
+    "expected_product": "Titanium Credit Card",
+    "expected_keywords": ["installments", "أقساط", "تقسيط"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-eligibility-infinite",
+    "query": "ايه شروط الحصول على الانفينيت؟",
+    "expected_product": "Visa Infinite",
+    "expected_keywords": ["eligibility", "شروط"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "ar-renewal-world",
+    "query": "كام رسوم تجديد بطاقة الورلد؟",
+    "expected_product": "World Credit Card",
+    "expected_keywords": ["renewal", "تجديد", "fees"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "en-fees-classic",
+    "query": "What are the fees for the Classic Credit Card?",
+    "expected_product": "Classic Credit Card",
+    "expected_keywords": ["fees"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "en-benefits-signature",
+    "query": "What benefits does the Visa Signature card offer?",
+    "expected_product": "Visa Signature",
+    "expected_keywords": ["benefits"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "en-installments-gold",
+    "query": "Show me the installment rates for the Gold credit card",
+    "expected_product": "Gold Credit Cards",
+    "expected_keywords": ["installments"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "mixed-fees-platinum",
+    "query": "ايه الـ fees على البلاتينيوم؟",
+    "expected_product": "Platinum Visa Master Credit Card",
+    "expected_keywords": ["fees", "رسوم"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "mixed-benefits-gold",
+    "query": "الجولد card بتدي إيه من benefits؟",
+    "expected_product": "Gold Credit Cards",
+    "expected_keywords": ["benefits", "مزايا"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "mixed-limit-titanium",
+    "query": "the credit limit بتاع التيتانيوم كام؟",
+    "expected_product": "Titanium Credit Card",
+    "expected_keywords": ["credit limit", "حد الائتمان"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "alias-platinum-colloquial",
+    "query": "البلاتينيوم بنك مصر",
+    "expected_product": "Platinum Visa Master Credit Card",
+    "expected_keywords": ["Platinum"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "alias-world-elite",
+    "query": "الورلد اليت كارت مزاياه إيه؟",
+    "expected_product": "World Elite Credit Card",
+    "expected_keywords": ["benefits", "مزايا"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "alias-al-araby",
+    "query": "بطاقة العربي بنك مصر بتدي إيه؟",
+    "expected_product": "Al-Araby Card",
+    "expected_keywords": ["benefits"],
+    "expected_behavior": "answer"
+  },
+  {
+    "id": "unknown-product-alpha",
+    "query": "ايه رسوم بطاقة الألفا؟",
+    "expected_behavior": "reject"
+  },
+  {
+    "id": "unknown-product-diamond",
+    "query": "What are the benefits of the Diamond card?",
+    "expected_behavior": "reject"
+  },
+  {
+    "id": "out-of-domain-mobile",
+    "query": "ازاي اصلح شاشة الموبايل؟",
+    "expected_behavior": "reject"
+  },
+  {
+    "id": "out-of-domain-food",
+    "query": "ايه أحسن مطعم في القاهرة؟",
+    "expected_behavior": "reject"
+  },
+  {
+    "id": "out-of-domain-weather",
+    "query": "What is the weather forecast for tomorrow in Cairo?",
+    "expected_behavior": "reject"
+  }
+]

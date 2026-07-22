@@ -81,6 +81,23 @@ class Settings(BaseSettings):
     # Override in .env to point at a different data directory.
     KNOWLEDGE_DATA_PATH: Path = Path("data")
 
+    # ==========================
+    # Query Optimization
+    # ==========================
+    # Set to False to bypass query optimization (pass original query straight to retrieval).
+    QUERY_OPTIMIZER_ENABLED: bool = True
+
+    # ==========================
+    # Unknown Answer Detection
+    # ==========================
+    # Minimum cosine similarity score for the top-ranked document.
+    # Queries whose best match falls below this threshold are rejected.
+    UNKNOWN_DETECTOR_MIN_SCORE: float = 0.35
+    # Minimum number of retrieved documents required before scoring is applied.
+    UNKNOWN_DETECTOR_MIN_RESULTS: int = 1
+    # Minimum acceptable mean similarity score across all retrieved documents.
+    UNKNOWN_DETECTOR_MEAN_THRESHOLD: float = 0.30
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

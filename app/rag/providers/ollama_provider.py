@@ -26,8 +26,8 @@ class OllamaRagProvider(LLMProvider):
             self._client = httpx.AsyncClient(base_url=self.base_url)
             logger.info("OllamaRagProvider initialized with base_url: %s", self.base_url)
 
-    async def generate(self, prompt: str) -> str:
-        """Sends the prompt to Ollama's /api/generate and returns the raw string response."""
+    async def generate_with_metadata(self, prompt: str) -> tuple[str, dict]:
+        """Sends the prompt to Ollama's /api/generate and returns (text_response, full_json_dict)."""
         if self._client is None:
             raise RuntimeError("OllamaRagProvider not initialized. Call initialize() first.")
 
@@ -67,7 +67,12 @@ class OllamaRagProvider(LLMProvider):
         if "response" not in data:
             raise RuntimeError(f"Ollama response payload missing expected 'response' key: {data}")
 
-        return data["response"].strip()
+        return data["response"].strip(), data
+
+    async def generate(self, prompt: str) -> str:
+        """Sends the prompt to Ollama's /api/generate and returns the raw string response."""
+        answer, _ = await self.generate_with_metadata(prompt)
+        return answer
 
     async def close(self) -> None:
         """Close connection client."""
