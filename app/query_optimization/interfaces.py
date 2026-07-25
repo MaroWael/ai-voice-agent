@@ -38,6 +38,27 @@ class QueryNormalizer(ABC):
         return await self.normalize(query)
 
 
+class QueryEnhancer(ABC):
+    """
+    Abstract interface for low-confidence query enhancement.
+    Rewrites conversational or noisy user queries into concise, search-optimized
+    query strings for vector retrieval recovery.
+    """
+
+    @abstractmethod
+    async def enhance(self, query: str) -> str:
+        """
+        Rewrite *query* to optimize for vector search retrieval.
+
+        Args:
+            query: Raw or normalized user question.
+
+        Returns:
+            An enhanced, search-optimized query string.
+        """
+        pass
+
+
 # Backwards compatibility alias for existing callers
 QueryOptimizer = QueryNormalizer
 

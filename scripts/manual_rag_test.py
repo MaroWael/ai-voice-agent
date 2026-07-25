@@ -34,22 +34,22 @@ from app.config.settings import settings
 from app.factories.rag import build_rag_service
 
 
-# Sample test queries covering Arabic, English, Mixed, and Unsupported scenarios
+# Sample test queries covering conversational voice queries and out-of-scope queries
 SAMPLE_QUERIES = [
     {
-        "category": "Arabic Query",
-        "question": "كام رسوم بطاقة البلاتينيوم؟",
+        "category": "Conversational Gold Card Query (Dialectal)",
+        "question": "ايه هيه مصاريف الفيزا الجولد",
     },
     {
-        "category": "English Query",
-        "question": "What are the fees for the Classic Credit Card?",
+        "category": "Conversational Platinum Card Query",
+        "question": "عايز اسأل عن مصاريف بطاقة البلاتينيوم",
     },
     {
-        "category": "Mixed-Language Query",
-        "question": "ايه الـ fees على بطاقة الجولد؟",
+        "category": "Conversational Classic Card Query",
+        "question": "كام رسوم بطاقة كلاسيك",
     },
     {
-        "category": "Unsupported / Out-of-Scope Query",
+        "category": "Out-of-Scope Loan Query",
         "question": "ما هو سعر الفائدة على القروض الشخصية؟",
     },
 ]

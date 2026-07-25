@@ -1,8 +1,6 @@
 import sys
 import logging
 import asyncio
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Response
@@ -29,14 +27,16 @@ async def lifespan(app: FastAPI):
     try:
         await check_postgres()
     except Exception as exc:
-        logger.error("PostgreSQL connection failed: %s", exc)
-        raise
+        logger.warning(
+            "PostgreSQL connection failed (non-fatal — not used by active pipeline): %s", exc
+        )
 
     try:
         await check_redis()
     except Exception as exc:
-        logger.error("Redis connection failed: %s", exc)
-        raise
+        logger.warning(
+            "Redis connection failed (non-fatal — not used by active pipeline): %s", exc
+        )
 
     try:
         await check_qdrant()
@@ -53,8 +53,9 @@ async def lifespan(app: FastAPI):
     try:
         await check_tts()
     except Exception as exc:
-        logger.error("TTS connection failed: %s", exc)
-        raise
+        logger.warning(
+            "TTS configuration check failed (non-fatal — add Silma credentials to .env to enable audio output): %s", exc
+        )
 
     logger.info("%s is ready.", settings.PROJECT_NAME)
 
@@ -200,7 +201,7 @@ async def demo_orchestrator():
     from input.buffer.speech_buffer import SpeechBuffer
     from input.stt.faster_whisper import FasterWhisperSTT
     from orchestration.orchestrator import Orchestrator
-    from llm.ollama import OllamaLanguageModel
+    from llm.rag_llm import RagLanguageModel
 
     global _recognizer_cache, _llm_cache, _tts_cache
 
@@ -210,7 +211,7 @@ async def demo_orchestrator():
     recognizer = _recognizer_cache
 
     if _llm_cache is None:
-        _llm_cache = OllamaLanguageModel()
+        _llm_cache = RagLanguageModel()
         await _llm_cache.initialize()
     llm = _llm_cache
 
@@ -298,7 +299,7 @@ async def websocket_audio(
     from input.buffer.speech_buffer import SpeechBuffer
     from input.models.audio_frame import AudioFrame
     from orchestration.orchestrator import Orchestrator
-    from llm.ollama import OllamaLanguageModel
+    from llm.rag_llm import RagLanguageModel
     from input.stt.faster_whisper import FasterWhisperSTT
     import numpy as np
     import time
@@ -312,7 +313,7 @@ async def websocket_audio(
     recognizer = _recognizer_cache
 
     if _llm_cache is None:
-        _llm_cache = OllamaLanguageModel()
+        _llm_cache = RagLanguageModel()
         await _llm_cache.initialize()
     llm = _llm_cache
 

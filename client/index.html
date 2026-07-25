@@ -3,7 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI WebSocket Test Client</title>
+    <title>Voice AI — RAG Customer Service Demo</title>
+    <meta name="description" content="End-to-end voice demo: speak a question, hear the RAG-powered answer.">
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,22 +13,29 @@
 <body>
     <div class="container">
         <header>
-            <h1>Voice AI Test Client</h1>
-            <p class="subtitle">Persistent WebSocket Audio Streaming Tester</p>
+            <div class="header-badge">Voice AI · RAG · Groq</div>
+            <h1>Voice Customer Service Demo</h1>
+            <p class="subtitle">Speak your question — get a RAG-powered answer, spoken aloud</p>
         </header>
 
-        <main class="grid">
-            <section class="card control-panel">
-                <h2>Connection & Control</h2>
-                
+        <main class="layout">
+
+            <!-- ── LEFT COLUMN: Connection + Controls ─────────────────────── -->
+            <aside class="card control-panel">
+                <h2>Connection</h2>
+
                 <div class="status-container">
                     <div class="status-item">
-                        <span class="status-label">WebSocket:</span>
+                        <span class="status-label">WebSocket</span>
                         <span id="ws-status" class="status-badge disconnected">Disconnected</span>
                     </div>
                     <div class="status-item">
-                        <span class="status-label">Microphone:</span>
+                        <span class="status-label">Microphone</span>
                         <span id="mic-status" class="status-badge inactive">Inactive</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Pipeline</span>
+                        <span id="pipeline-status" class="status-badge inactive">Idle</span>
                     </div>
                 </div>
 
@@ -43,23 +51,106 @@
 
                 <hr class="separator">
 
-                <div class="button-group">
-                    <button id="btn-start" class="btn btn-success" disabled>Start Recording</button>
-                    <button id="btn-stop" class="btn btn-warning" disabled>Stop Recording</button>
+                <div class="mic-center">
+                    <button id="btn-mic" class="btn-mic" disabled title="Hold to speak / Click to toggle">
+                        <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 1a4 4 0 0 1 4 4v6a4 4 0 0 1-8 0V5a4 4 0 0 1 4-4zm0 2a2 2 0 0 0-2 2v6a2 2 0 0 0 4 0V5a2 2 0 0 0-2-2zm7 8a1 1 0 0 1 1 1 8 8 0 0 1-7 7.938V22h2a1 1 0 0 1 0 2H9a1 1 0 0 1 0-2h2v-2.062A8 8 0 0 1 4 12a1 1 0 0 1 2 0 6 6 0 0 0 12 0 1 1 0 0 1 1-1z"/>
+                        </svg>
+                        <span id="mic-label">Start Recording</span>
+                    </button>
                 </div>
-            </section>
 
-            <section class="card log-panel">
-                <div class="log-header">
-                    <h2>Event Logs</h2>
-                    <button id="btn-clear" class="btn btn-secondary btn-sm">Clear Logs</button>
+                <hr class="separator">
+
+                <div class="log-header-row">
+                    <span class="section-label">Event Log</span>
+                    <button id="btn-clear" class="btn btn-secondary btn-sm">Clear</button>
                 </div>
                 <div id="log-area" class="log-area">
                     <div class="log-entry system">System initialized. Ready to connect.</div>
                 </div>
+            </aside>
+
+            <!-- ── RIGHT COLUMN: RAG Debug Panel ──────────────────────────── -->
+            <section class="right-column">
+
+                <!-- Last Response Card -->
+                <div class="card debug-panel" id="debug-panel">
+                    <div class="debug-header">
+                        <h2>Last Response</h2>
+                        <span id="turn-counter" class="turn-badge">—</span>
+                    </div>
+
+                    <!-- Recognized Speech -->
+                    <div class="debug-block" id="block-transcript">
+                        <div class="debug-block-label">
+                            <span class="dot dot-blue"></span>
+                            Recognized Speech
+                        </div>
+                        <div id="transcript-text" class="debug-value transcript-value">Waiting for speech...</div>
+                        <div id="transcript-lang" class="debug-meta"></div>
+                    </div>
+
+                    <!-- RAG Status -->
+                    <div class="debug-block" id="block-status">
+                        <div class="debug-block-label">
+                            <span class="dot dot-yellow"></span>
+                            RAG Status
+                        </div>
+                        <div id="rag-status-badge" class="rag-status-value">—</div>
+                    </div>
+
+                    <!-- Response Text -->
+                    <div class="debug-block" id="block-response">
+                        <div class="debug-block-label">
+                            <span class="dot dot-green"></span>
+                            Response
+                        </div>
+                        <div id="response-text" class="debug-value response-value" dir="auto">Waiting for response...</div>
+                    </div>
+
+                    <!-- Audio Playback -->
+                    <div class="debug-block" id="block-audio">
+                        <div class="debug-block-label">
+                            <span class="dot dot-purple"></span>
+                            Audio Playback
+                        </div>
+                        <div id="audio-status" class="audio-status-line">No audio received yet.</div>
+                        <audio id="audio-player" controls class="audio-player" style="display:none;"></audio>
+                    </div>
+
+                    <!-- Latency -->
+                    <div class="debug-block latency-row" id="block-latency">
+                        <div class="latency-item">
+                            <span class="latency-label">Turn</span>
+                            <span id="lat-turn" class="latency-value">—</span>
+                        </div>
+                        <div class="latency-item">
+                            <span class="latency-label">Audio size</span>
+                            <span id="lat-audio" class="latency-value">—</span>
+                        </div>
+                        <div class="latency-item">
+                            <span class="latency-label">Round-trip</span>
+                            <span id="lat-rtt" class="latency-value">—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conversation History -->
+                <div class="card history-panel">
+                    <div class="debug-header">
+                        <h2>Conversation History</h2>
+                        <button id="btn-clear-history" class="btn btn-secondary btn-sm">Clear</button>
+                    </div>
+                    <div id="history-area" class="history-area">
+                        <div class="history-empty">No turns yet.</div>
+                    </div>
+                </div>
+
             </section>
         </main>
     </div>
+
     <script src="app.js"></script>
 </body>
 </html>

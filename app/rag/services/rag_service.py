@@ -19,7 +19,7 @@ import logging
 import time
 
 from app.config.settings import settings
-from app.query_optimization.interfaces import QueryNormalizer
+from app.query_optimization.interfaces import QueryNormalizer, QueryEnhancer
 from app.rag.builders.context_builder import ContextBuilder
 from app.rag.builders.language_detector import detect_query_language
 from app.rag.builders.prompt_builder import PromptBuilder
@@ -47,6 +47,7 @@ class RagService:
         llm_provider: LLMProvider,
         query_normalizer: QueryNormalizer,
         unknown_detector: UnknownAnswerDetector,
+        query_enhancer: QueryEnhancer | None = None,
         translation_service: TranslationService | None = None,
     ) -> None:
         self._retrieval_service = retrieval_service
@@ -55,6 +56,7 @@ class RagService:
         self._llm_provider = llm_provider
         self._query_normalizer = query_normalizer
         self._unknown_detector = unknown_detector
+        self._query_enhancer = query_enhancer
         self._translation_service = translation_service
 
     async def initialize(self) -> None:
@@ -102,17 +104,62 @@ class RagService:
             )
         t_trans_ms = (time.perf_counter() - t_trans_start) * 1000.0
 
-        # ── Step 3: Dense Retrieval ───────────────────────────────────────────
+        # ── Step 3: First-Pass Dense Retrieval ───────────────────────────────
         t1 = time.perf_counter()
         retrieved_docs, retrieval_timing = await self._retrieval_service.retrieve_timed(
             retrieval_query, top_k=top_k
         )
         t_retrieval_ms = (time.perf_counter() - t1) * 1000.0
 
-        # ── Step 4: Unknown Answer Detection ─────────────────────────────────
+        # ── Step 4: First-Pass Unknown Answer Detection ───────────────────────
         t2 = time.perf_counter()
         detection = await self._unknown_detector.evaluate(question, retrieved_docs)
         t_detect_ms = (time.perf_counter() - t2) * 1000.0
+
+        t_enhance_ms = 0.0
+
+        # ── Step 4.5: Low-Confidence Retrieval Recovery (Second Pass) ────────
+        if not detection.has_context and self._query_enhancer is not None and retrieved_docs:
+            recovery_cutoff = settings.RAG_RECOVERY_MIN_SCORE
+            logger.info("First retrieval score: %.4f (reason=%s)", detection.top_score, detection.reason.value)
+
+            if detection.top_score >= recovery_cutoff:
+                logger.info(
+                    "Enhancement Attempted: TRUE (top_score %.4f >= cutoff %.4f)",
+                    detection.top_score,
+                    recovery_cutoff,
+                )
+
+                t_enh_start = time.perf_counter()
+                enhanced_query = await self._query_enhancer.enhance(retrieval_query)
+                t_enhance_ms = (time.perf_counter() - t_enh_start) * 1000.0
+
+                if enhanced_query and enhanced_query != retrieval_query:
+                    t1_retry = time.perf_counter()
+                    second_docs, _ = await self._retrieval_service.retrieve_timed(
+                        enhanced_query, top_k=top_k
+                    )
+                    t_retrieval_ms += (time.perf_counter() - t1_retry) * 1000.0
+
+                    second_detection = await self._unknown_detector.evaluate(question, second_docs)
+
+                    logger.info(
+                        "Enhanced Query: %r | Second retrieval score: %.4f | Final Decision: %s",
+                        enhanced_query,
+                        second_detection.top_score,
+                        "ACCEPTED" if second_detection.has_context else f"REJECTED ({second_detection.reason.value})",
+                    )
+
+                    if second_detection.has_context:
+                        retrieved_docs = second_docs
+                        detection = second_detection
+                        normalized_query = f"{normalized_query} -> [Enhanced: {enhanced_query}]"
+            else:
+                logger.info(
+                    "Enhancement Attempted: FALSE (top_score %.4f < cutoff %.4f). Skipping recovery.",
+                    detection.top_score,
+                    recovery_cutoff,
+                )
 
         if not detection.has_context:
             t_total_ms = (time.perf_counter() - t_total_start) * 1000.0
@@ -139,6 +186,7 @@ class RagService:
                         "normalization": round(t_norm_ms, 2),
                         "translation": round(t_trans_ms, 2),
                         "retrieval": round(t_retrieval_ms, 2),
+                        "enhancement": round(t_enhance_ms, 2),
                         "detection": round(t_detect_ms, 2),
                         "generation": 0.0,
                         "total": round(t_total_ms, 2),

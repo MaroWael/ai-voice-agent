@@ -54,14 +54,22 @@ class Settings(BaseSettings):
     # ==========================
     # Language Model (LLM)
     # ==========================
-    LLM_PROVIDER: str = "groq"  # "ollama" | "groq"
-    LLM_BASE_URL: str = "http://localhost:11434"
-    LLM_MODEL: str = "qwen3:1.7b"
-    LLM_TIMEOUT: float = 180.0
-    LLM_NUM_PREDICT: int = 350
-    LLM_TEMPERATURE: float = 0.1
-    LLM_TOP_P: float = 0.2
-    LLM_REPEAT_PENALTY: float = 1.1
+    LLM_PROVIDER: str = "groq"  # "ollama" | "groq"  — used by RAG factory only
+
+    # ------------------------------------------------------------------
+    # DEPRECATED — Ollama/Qwen3 voice-path settings
+    # These settings were used by OllamaLanguageModel in the voice pipeline.
+    # The voice path now uses RagLanguageModel → GroqProvider exclusively.
+    # These fields are retained to avoid breaking imports but are no longer
+    # read at runtime. They can be removed after the migration is confirmed.
+    # ------------------------------------------------------------------
+    LLM_BASE_URL: str = "http://localhost:11434"   # deprecated
+    LLM_MODEL: str = "qwen3:1.7b"                 # deprecated
+    LLM_TIMEOUT: float = 180.0                     # deprecated
+    LLM_NUM_PREDICT: int = 350                     # deprecated
+    LLM_TEMPERATURE: float = 0.1                   # deprecated
+    LLM_TOP_P: float = 0.2                         # deprecated
+    LLM_REPEAT_PENALTY: float = 1.1                # deprecated
 
     # ==========================
     # Groq Settings
@@ -102,6 +110,7 @@ class Settings(BaseSettings):
     RAG_TOP_K: int = 5
     RAG_MAX_CONTEXT_CHARS: int = 4000
     RAG_DEBUG: bool = False
+    RAG_RECOVERY_MIN_SCORE: float = 0.35  # Cutoff below which low-confidence recovery is skipped
     QUERY_NORMALIZER_ENABLED: bool = True
     QUERY_OPTIMIZER_ENABLED: bool = True  # Backward-compatible alias for QUERY_NORMALIZER_ENABLED
     TRANSLATION_ENABLED: bool = False

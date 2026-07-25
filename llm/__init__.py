@@ -1,5 +1,5 @@
 from llm.models import AIResponse
-from llm.ollama import OllamaLanguageModel
+from llm.rag_llm import RagLanguageModel
 from llm.check import check_llm
 
-__all__ = ["AIResponse", "OllamaLanguageModel", "check_llm"]
+__all__ = ["AIResponse", "RagLanguageModel", "check_llm"]
