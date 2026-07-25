@@ -22,11 +22,13 @@ class PromptBuilder:
         Initializes the builder with a configurable prompt template string.
 
         Args:
-            template: The raw prompt template containing '{context}' and '{question}' placeholders.
+            template: The raw prompt template containing context and question placeholders.
         """
-        if "{context}" not in template or "{question}" not in template:
+        has_context = "{context}" in template or "{retrieved_context}" in template
+        has_question = "{question}" in template or "{user_query}" in template
+        if not has_context or not has_question:
             raise ValueError(
-                "Prompt template must contain both '{context}' and '{question}' placeholders."
+                "Prompt template must contain context and question placeholders."
             )
         self._template = template
 
@@ -44,11 +46,14 @@ class PromptBuilder:
         lang_code = detect_query_language(question)
         lang_instruction = get_language_instruction(lang_code)
 
+        kwargs = {
+            "context": context,
+            "retrieved_context": context,
+            "question": question,
+            "user_query": question,
+        }
         if "{language_instruction}" in self._template:
-            return self._template.format(
-                language_instruction=lang_instruction,
-                context=context,
-                question=question,
-            )
+            kwargs["language_instruction"] = lang_instruction
 
-        return self._template.format(context=context, question=question)
+        return self._template.format(**kwargs)
+

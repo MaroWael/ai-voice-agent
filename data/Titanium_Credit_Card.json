@@ -239,5 +239,13 @@
       "local_path": "output/images/04839-v1-Banque-Misr-MC-Titanium-Credit-Contactless.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة التيتانيوم الائتمانية",
+  "aliases": [
+    "بطاقة التيتانيوم",
+    "التيتانيوم",
+    "تيتانيوم",
+    "Titanium Card",
+    "بطاقة تيتانيوم بنك مصر"
+  ]
 }

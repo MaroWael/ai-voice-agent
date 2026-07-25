@@ -37,5 +37,10 @@
       "local_path": "output/images/apply-en-cre.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة بنك مصر بضمان بطاقة ائتمان اخرى",
+  "aliases": [
+    "بطاقة بضمان بطاقة اخرى",
+    "بطاقة مسبقة الدفع"
+  ]
 }

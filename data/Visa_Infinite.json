@@ -346,5 +346,12 @@
       "local_path": "output/images/Apply-Now-EN.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة فيزا انفينيت",
+  "aliases": [
+    "بطاقة الانفينيت",
+    "الانفينيت",
+    "انفينيت",
+    "Visa Infinite Card"
+  ]
 }

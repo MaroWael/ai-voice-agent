@@ -8,31 +8,31 @@ class Settings(BaseSettings):
     # ==========================
     # Project
     # ==========================
-    PROJECT_NAME: str
+    PROJECT_NAME: str = "Online RAG Customer Service Assistant"
 
     # ==========================
     # PostgreSQL
     # ==========================
-    POSTGRES_HOST: str
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    POSTGRES_PORT: int
+    POSTGRES_HOST: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    POSTGRES_DB: str = "voice_agent"
+    POSTGRES_PORT: int = 5432
 
     # ==========================
     # Redis
     # ==========================
-    REDIS_HOST: str
-    REDIS_PORT: int
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
 
     # ==========================
     # Qdrant
     # ==========================
-    QDRANT_HOST: str
-    QDRANT_HTTP_PORT: int
+    QDRANT_HOST: str = "localhost"
+    QDRANT_HTTP_PORT: int = 6333
     QDRANT_COLLECTION_NAME: str = "knowledge_base"
     QDRANT_DISTANCE_METRIC: str = "Cosine"
-    QDRANT_BATCH_SIZE: int = 64
+    QDRANT_BATCH_SIZE: int = 16
 
     # ==========================
     # Audio Pipeline
@@ -54,22 +54,32 @@ class Settings(BaseSettings):
     # ==========================
     # Language Model (LLM)
     # ==========================
+    LLM_PROVIDER: str = "groq"  # "ollama" | "groq"
     LLM_BASE_URL: str = "http://localhost:11434"
     LLM_MODEL: str = "qwen3:1.7b"
     LLM_TIMEOUT: float = 180.0
-    LLM_NUM_PREDICT: int = 150
+    LLM_NUM_PREDICT: int = 350
     LLM_TEMPERATURE: float = 0.1
     LLM_TOP_P: float = 0.2
     LLM_REPEAT_PENALTY: float = 1.1
 
+    # ==========================
+    # Groq Settings
+    # ==========================
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    GROQ_TIMEOUT: float = 30.0
+    GROQ_TEMPERATURE: float = 0.1
+    GROQ_MAX_TOKENS: int = 350
 
     # ==========================
     # Silma Text-to-Speech (TTS)
     # ==========================
-    SILMA_API_KEY: str
-    SILMA_BASE_URL: str
-    SILMA_MODEL_ID: str
-    SILMA_VOICE_ID: str
+    SILMA_API_KEY: str = ""
+    SILMA_BASE_URL: str = ""
+    SILMA_MODEL_ID: str = ""
+    SILMA_VOICE_ID: str = ""
 
     # ==========================
     # Embeddings
@@ -87,26 +97,34 @@ class Settings(BaseSettings):
     KNOWLEDGE_DATA_PATH: Path = Path("data")
 
     # ==========================
-    # Query Optimization
+    # RAG Pipeline Settings
     # ==========================
-    # Set to False to bypass query optimization (pass original query straight to retrieval).
-    QUERY_OPTIMIZER_ENABLED: bool = True
+    RAG_TOP_K: int = 5
+    RAG_MAX_CONTEXT_CHARS: int = 4000
+    RAG_DEBUG: bool = False
+    QUERY_NORMALIZER_ENABLED: bool = True
+    QUERY_OPTIMIZER_ENABLED: bool = True  # Backward-compatible alias for QUERY_NORMALIZER_ENABLED
+    TRANSLATION_ENABLED: bool = False
+    TRANSLATION_PROVIDER: str = "none"  # "none" | "qwen"
+    RAG_REFUSAL_MSG_EN: str = "I don't have enough information in the available knowledge base to answer this question."
+    RAG_REFUSAL_MSG_AR: str = "لا أملك معلومات كافية في قاعدة المعرفة للإجابة على هذا السؤال."
 
     # ==========================
     # Unknown Answer Detection
     # ==========================
     # Minimum cosine similarity score for the top-ranked document.
     # Queries whose best match falls below this threshold are rejected.
-    UNKNOWN_DETECTOR_MIN_SCORE: float = 0.35
+    UNKNOWN_DETECTOR_MIN_SCORE: float = 0.58
     # Minimum number of retrieved documents required before scoring is applied.
     UNKNOWN_DETECTOR_MIN_RESULTS: int = 1
     # Minimum acceptable mean similarity score across all retrieved documents.
-    UNKNOWN_DETECTOR_MEAN_THRESHOLD: float = 0.30
+    UNKNOWN_DETECTOR_MEAN_THRESHOLD: float = 0.50
 
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
+        extra="ignore",
     )
 
     @property

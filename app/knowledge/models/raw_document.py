@@ -35,9 +35,12 @@ class RawDocument(BaseModel):
     description: str
     sections: list[RawSection]
 
+    # Multilingual aliases read directly from JSON data
+    aliases: list[str] = []
+    arabic_name: str | None = None
+
     # Injected by the loader; not present in source JSON.
     source_path: Path
 
     # Reserved for future multilingual support.
-    # Not detected automatically — callers may set this if known.
     language: str | None = None

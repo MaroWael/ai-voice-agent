@@ -52,16 +52,27 @@ async def _is_initialized() -> bool:
         return False
 
 
-async def initialize_knowledge_base() -> None:
+async def initialize_knowledge_base(force_reindex: bool = False) -> None:
     """
     Idempotent knowledge base initialization.
 
     Workflow:
         1. Check whether the collection already contains indexed documents.
-        2. If yes  →  print a short message and return immediately.
-        3. If no   →  load JSON files, validate, embed, and index them.
+        2. If force_reindex=True -> delete collection first.
+        3. If initialized & not force_reindex -> skip indexing.
+        4. Otherwise -> load JSON files, validate, embed, and index them.
     """
-    if await _is_initialized():
+    client = get_qdrant()
+    collection_name = settings.QDRANT_COLLECTION_NAME
+
+    if force_reindex:
+        try:
+            if await client.collection_exists(collection_name):
+                logger.info("Reindex forced. Deleting existing Qdrant collection '%s'...", collection_name)
+                await client.delete_collection(collection_name)
+        except Exception as exc:
+            logger.warning("Error deleting collection '%s' for reindex: %s", collection_name, exc)
+    elif await _is_initialized():
         print("Knowledge base already initialized.")
         print("Skipping indexing.")
         return

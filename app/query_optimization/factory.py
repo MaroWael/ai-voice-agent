@@ -1,27 +1,19 @@
 """
-Query Optimization — Factory
+Query Normalization — Factory
 
-Constructs a fully wired QueryOptimizer using the standard banking dictionaries.
-Callers never depend on RuleBasedQueryOptimizer directly — only on QueryOptimizer.
+Constructs a fully wired QueryNormalizer.
 """
 
-from app.query_optimization.dictionaries import (
-    BANKING_KEYWORD_EXPANSIONS,
-    PHRASE_NORMALIZATIONS,
-    PRODUCT_ALIASES,
-)
-from app.query_optimization.interfaces import QueryOptimizer
-from app.query_optimization.rule_based import RuleBasedQueryOptimizer
+from app.query_optimization.interfaces import QueryNormalizer
+from app.query_optimization.rule_based import RuleBasedQueryNormalizer
 
 
-def build_query_optimizer() -> QueryOptimizer:
+def build_query_normalizer() -> QueryNormalizer:
     """
-    Return a fully wired RuleBasedQueryOptimizer.
-
-    The concrete type is an implementation detail hidden behind QueryOptimizer.
+    Return a fully wired RuleBasedQueryNormalizer.
     """
-    return RuleBasedQueryOptimizer(
-        phrase_normalizations=PHRASE_NORMALIZATIONS,
-        keyword_expansions=BANKING_KEYWORD_EXPANSIONS,
-        product_aliases=PRODUCT_ALIASES,
-    )
+    return RuleBasedQueryNormalizer()
+
+
+# Backwards compatibility alias
+build_query_optimizer = build_query_normalizer

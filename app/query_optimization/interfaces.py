@@ -1,34 +1,43 @@
 """
-Query Optimization — Interface
+Query Normalization — Interface
 
-Defines the abstract contract for query optimizers.
-Higher layers depend on QueryOptimizer, never on concrete implementations.
+Defines the abstract contract for query normalizers.
+Higher layers depend on QueryNormalizer, never on concrete implementations.
 """
 
 from abc import ABC, abstractmethod
 
 
-class QueryOptimizer(ABC):
+class QueryNormalizer(ABC):
     """
-    Abstract base for query optimizers used by the RAG pipeline.
+    Abstract base for query normalizers used by the RAG pipeline.
 
-    Implementations receive a raw user query and return an optimized version
-    suitable for semantic retrieval. They MUST preserve the user's language —
-    Arabic input stays Arabic; optimization only improves token coverage.
+    Implementations receive a raw user query and return a clean, normalized
+    version suitable for semantic retrieval.
 
-    The optimized query is used exclusively by RetrievalService.
-    PromptBuilder always receives the original, unmodified question.
+    Language preservation rule:
+    User language is strictly preserved (Arabic stays Arabic, English stays English).
+    No keyword expansion or translation is performed.
     """
 
     @abstractmethod
-    async def optimize(self, query: str) -> str:
+    async def normalize(self, query: str) -> str:
         """
-        Return an optimized version of *query* for semantic retrieval.
+        Return a normalized version of *query* for semantic retrieval.
 
         Args:
             query: Raw user question, potentially in Arabic, English, or mixed.
 
         Returns:
-            An optimized query string. If no improvement is possible (empty
-            input, whitespace-only), returns an empty string.
+            A clean normalized query string.
         """
+        pass
+
+    async def optimize(self, query: str) -> str:
+        """Backwards-compatible alias for normalize."""
+        return await self.normalize(query)
+
+
+# Backwards compatibility alias for existing callers
+QueryOptimizer = QueryNormalizer
+

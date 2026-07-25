@@ -250,5 +250,14 @@
       "local_path": "output/images/Gold-MasterCard.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة الجولد الائتمانية",
+  "aliases": [
+    "بطاقة الجولد",
+    "الجولد",
+    "جولد",
+    "بطاقة ذهبية",
+    "Gold Card",
+    "بطاقة جولد بنك مصر"
+  ]
 }

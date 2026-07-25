@@ -20,6 +20,10 @@ class DocumentMetadata(BaseModel):
     # Title of the section this document was extracted from.
     section: str
 
+    # Multilingual product aliases read from source JSON
+    aliases: list[str] = []
+    arabic_name: str | None = None
+
     # BCP-47 language tag. Defaults to "en" until language detection is added.
     language: str
 

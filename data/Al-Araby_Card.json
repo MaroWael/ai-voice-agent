@@ -51,5 +51,11 @@
       "local_path": "output/images/AL-ARABY-CARD.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة العربي",
+  "aliases": [
+    "بطاقة العربي",
+    "العربي",
+    "Al-Araby Card"
+  ]
 }

@@ -35,6 +35,9 @@ class DetectionReason(Enum):
     LOW_MEAN_SCORE = "low_mean_score"
     """The mean similarity score across top results is below the threshold."""
 
+    DOMAIN_MISMATCH = "domain_mismatch"
+    """The query intent asks for a domain/product (e.g. loans) absent from retrieved context."""
+
     SUFFICIENT_CONTEXT = "sufficient_context"
     """All signals indicate sufficient evidence to answer the query."""
 

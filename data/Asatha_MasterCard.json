@@ -132,5 +132,12 @@
       "local_path": "output/images/Kasatha-MasterCard.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة أساطة ماستركارد",
+  "aliases": [
+    "بطاقة أساطة",
+    "أساطة",
+    "اساطة",
+    "Asatha Card"
+  ]
 }

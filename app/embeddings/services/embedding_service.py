@@ -41,19 +41,30 @@ class EmbeddingService:
         """
         Construct the text representation of a KnowledgeDocument for embedding.
 
-        Enriches document content with semantic context (product name and section title)
-        while excluding administrative metadata.
-
-        Args:
-            document: The KnowledgeDocument to format.
-
-        Returns:
-            The structured embedding text string.
+        Enriches document content with product name, section title, and multilingual aliases
+        sourced directly from the raw knowledge metadata.
         """
+        product = document.metadata.product_name if document.metadata else "Banking Product"
+        title = document.title or "Section"
+        
+        aliases = document.metadata.aliases if document.metadata else []
+        arabic_name = document.metadata.arabic_name if document.metadata else None
+
+        alias_terms = []
+        if arabic_name:
+            alias_terms.append(arabic_name)
+        if aliases:
+            alias_terms.extend(aliases)
+        
+        alias_str = " / ".join(alias_terms) if alias_terms else ""
+        alias_line = f"Multilingual Product Names: {alias_str}\n" if alias_str else ""
+
         return (
-            f"Product: {document.metadata.product_name}\n\n"
-            f"Section: {document.title}\n\n"
-            f"Content:\n{document.content}"
+            f"Banking Product: {product}\n"
+            f"{alias_line}"
+            f"Section Title: {title}\n"
+            f"Topic: {product} {alias_str} {title}\n\n"
+            f"Details:\n{document.content}"
         )
 
     async def embed_documents(

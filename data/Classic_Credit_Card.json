@@ -224,5 +224,13 @@
       "local_path": "output/images/Classic-Credit-Cards.ashx"
     }
   ],
-  "pdfs": []
+  "pdfs": [],
+  "arabic_name": "بطاقة الكلاسيك الائتمانية",
+  "aliases": [
+    "بطاقة الكلاسيك",
+    "الكلاسيك",
+    "كلاسيك",
+    "Classic Card",
+    "بطاقة كلاسيك بنك مصر"
+  ]
 }

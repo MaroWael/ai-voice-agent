@@ -43,11 +43,13 @@ def get_language_instruction(lang_code: str) -> str:
         return (
             "LANGUAGE MANDATE:\n"
             "- The customer asked in Arabic (or Arabic-dominant mixed language).\n"
-            "- You MUST answer entirely in Arabic.\n"
-            "- Preserve brand and product names (e.g. Platinum, Visa, Mastercard, Gold, Titanium, Infinite, Signature, World) in English/standard form."
+            "- Answer entirely in natural Egyptian banking Arabic (e.g. use 'رسوم الإصدار', 'رسوم التجديد', 'البطاقة الائتمانية', 'الحد الائتماني').\n"
+            "- NEVER use literal or unnatural translations (e.g. NEVER write 'البطاقة التوافرية' or 'المتوازن').\n"
+            "- Preserve English product names, brand terms, and currency codes verbatim (e.g. Platinum, Visa, Mastercard, Gold, Titanium, Points, EGP)."
         )
     return (
         "LANGUAGE MANDATE:\n"
         "- The customer asked in English.\n"
-        "- You MUST answer entirely in English."
+        "- Answer entirely in clear, natural English.\n"
+        "- Preserve product names, numbers, and currency codes verbatim (e.g. EGP 500)."
     )

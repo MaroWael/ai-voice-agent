@@ -54,22 +54,33 @@ class KnowledgeNormalizer:
 
     def normalize_table(self, table: list[list[str]]) -> str:
         """
-        Format a table into readable, embedding-friendly prose for any column count.
+        Format a table into clean, embedding-friendly prose.
 
-        Every data row is rendered as a multi-line block — one "Header: value" pair
-        per line — so that column context is always preserved in the output.
-        Rows are separated by a blank line to keep each record visually distinct.
-
-        Special case: when the header is "tenor" (case-insensitive), numeric
-        values are suffixed with " months" for semantic clarity (e.g. "3 months").
-
-        Empty cells and empty rows are silently skipped.
+        2-column key-value tables are rendered as concise bullet pairs (e.g. "• Issuance: EGP 500").
+        Multi-column tables render header-value pairs per line.
         """
         if not table or len(table) < 2:
             return ""
 
         headers = [self.normalize_text(cell).rstrip(":") for cell in table[0]]
+        num_cols = len(headers)
         formatted_rows: list[str] = []
+
+        if num_cols == 2:
+            for row in table[1:]:
+                if not row or len(row) < 2:
+                    continue
+                val0 = self.normalize_text(row[0])
+                val1 = self.normalize_text(row[1])
+                if not val0 and not val1:
+                    continue
+                val0 = self._format_cell_value(headers[0], val0)
+                val1 = self._format_cell_value(headers[1], val1)
+                if val0 and val1:
+                    formatted_rows.append(f"• {val0}: {val1}")
+                elif val0:
+                    formatted_rows.append(f"• {val0}")
+            return "\n".join(formatted_rows)
 
         for row in table[1:]:
             pairs: list[str] = []
