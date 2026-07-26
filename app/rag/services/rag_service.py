@@ -143,10 +143,23 @@ class RagService:
 
                     second_detection = await self._unknown_detector.evaluate(question, second_docs)
 
+                    first_score = detection.top_score
+                    second_score = second_detection.top_score
+                    score_delta = second_score - first_score
+
                     logger.info(
-                        "Enhanced Query: %r | Second retrieval score: %.4f | Final Decision: %s",
+                        "Recovery Attempt Summary:\n"
+                        "  Original Query:        %r\n"
+                        "  Enhanced Query:        %r\n"
+                        "  First Retrieval Score:  %.4f\n"
+                        "  Second Retrieval Score: %.4f\n"
+                        "  Score Improvement:     %+.4f\n"
+                        "  Final Decision:        %s",
+                        question,
                         enhanced_query,
-                        second_detection.top_score,
+                        first_score,
+                        second_score,
+                        score_delta,
                         "ACCEPTED" if second_detection.has_context else f"REJECTED ({second_detection.reason.value})",
                     )
 

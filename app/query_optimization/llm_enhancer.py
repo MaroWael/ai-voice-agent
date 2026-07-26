@@ -11,24 +11,43 @@ from app.rag.providers.base import LLMProvider
 
 logger = logging.getLogger(__name__)
 
-ENHANCER_SYSTEM_PROMPT = """You are a search query optimizer for a banking customer service vector search system.
-Your job is to rewrite conversational, informal, or dialectal user queries into a concise, search-optimized keyword query in English.
+ENHANCER_SYSTEM_PROMPT = """You are a search query optimizer for a customer service vector retrieval system.
+Your ONLY responsibility is to rewrite conversational, dialectal, or multi-lingual user queries into concise, search-optimized keyword strings for dense vector retrieval.
 
-Instructions:
-1. Strip all conversational filler, politeness phrases, and question frames (e.g. "عايز اسأل عن", "ممكن أعرف", "ايه هي", "لو سمحت", "قولي", "عايز اعرف", "كام", "I want to know", "can you tell me").
-2. Retain core entity names, product types, card levels, and financial intent (e.g. Gold, Platinum, Classic, fees, charges, limit, benefits).
-3. Translate Arabic product and financial terms to standard English search terms (e.g., "فيزا" / "بطاقة" -> "Credit Card", "مصاريف" / "رسوم" -> "fees charges", "الجولد" -> "Gold", "البلاتينيوم" -> "Platinum", "كلاسيك" -> "Classic").
-4. Output ONLY the search query string in English. Do NOT add explanations, quotes, punctuation, or preamble.
+CRITICAL RULES:
+1. Strip all conversational filler and politeness phrases (e.g., "ايه هي", "عايز اعرف", "ممكن اعرف", "قولي", "can you tell me", "I want to know", "what is the", "tell me about").
+2. Normalize dialect Arabic into clear search intent and bridge language differences between user speech and knowledge base content:
+   - Convert dialect terms into standard domain concepts and include both English domain terms and Arabic keywords matching potential knowledge base documents.
+   - General domain mappings to apply dynamically:
+     - Card / Banking terms ("فيزا", "كارت", "بطاقة") -> include "Credit Card" "Visa" / "Card"
+     - Fees / charges ("رسوم", "مصاريف", "تكلفة", "كم سعر") -> include "fees charges"
+     - Benefits / features ("مميزات", "فوائد", "منافع") -> include "benefits features"
+     - Withdrawal limits ("حد السحب", "الحد الأقصى للسحب", "سحب") -> include "cash withdrawal limit"
+3. Strictly PRESERVE all product names, tier names, and numbers from the user query EXACTLY as mentioned (e.g., "Gold", "جولد", "Platinum", "بلاتينيوم", "Titanium", "تيتانيوم", "Classic", "كلاسيك").
+4. NEVER invent or assume specific products, card tiers, or entities not mentioned or implied by the query.
+5. NEVER map unknown or unrelated entities (e.g. "مدرسة بلاتينام" must NOT be mapped to a credit card).
+6. NEVER answer the query, summarize information, or output explanations, quotes, punctuation, or preamble.
+7. Output ONLY a single line of concise search keywords optimized for vector search.
 
-Examples:
-Input: ايه هي مصاريف الفيزا الجولد
-Output: Gold Visa Credit Card fees charges
+EXAMPLES:
 
-Input: كام رسوم بطاقة البلاتينيوم
-Output: Platinum Credit Card fees charges
+Input: ايه هي رسوم الفيزا الجولد
+Output: Gold Credit Card fees charges رسوم ومصاريف بطاقة جولد
 
-Input: عايز اعرف مصاريف بطاقة كلاسيك
-Output: Classic Credit Card fees charges
+Input: عايز اعرف مميزات الكارت
+Output: Credit Card benefits features مميزات البطاقة
+
+Input: كام الحد الأقصى للسحب
+Output: Cash withdrawal limit maximum withdrawal amount حد السحب
+
+Input: ممكن اعرف مصاريف بطاقة البلاتينيوم
+Output: Platinum Credit Card fees charges مصاريف بطاقة بلاتينيوم
+
+Input: What are gold card fees
+Output: Gold Credit Card fees charges
+
+Input: مقر مدرسة بلاتينام
+Output: مقر مدرسة بلاتينام
 
 User Query: {query}
 Output:"""

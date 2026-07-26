@@ -132,7 +132,7 @@ async def demo_stt():
     from input.adapter.audio_frame_adapter import AudioFrameAdapter
     from input.vad.silero import SileroVAD
     from input.buffer.speech_buffer import SpeechBuffer
-    from input.stt.faster_whisper import FasterWhisperSTT
+    from input.stt import build_speech_recognizer
 
     global _recognizer_cache
     
@@ -140,7 +140,7 @@ async def demo_stt():
     sys.stdout.flush()
 
     if _recognizer_cache is None:
-        _recognizer_cache = FasterWhisperSTT()
+        _recognizer_cache = build_speech_recognizer()
         await _recognizer_cache.initialize()
     recognizer = _recognizer_cache
 
@@ -199,14 +199,14 @@ async def demo_orchestrator():
     from input.adapter.audio_frame_adapter import AudioFrameAdapter
     from input.vad.silero import SileroVAD
     from input.buffer.speech_buffer import SpeechBuffer
-    from input.stt.faster_whisper import FasterWhisperSTT
+    from input.stt import build_speech_recognizer
     from orchestration.orchestrator import Orchestrator
     from llm.rag_llm import RagLanguageModel
 
     global _recognizer_cache, _llm_cache, _tts_cache
 
     if _recognizer_cache is None:
-        _recognizer_cache = FasterWhisperSTT()
+        _recognizer_cache = build_speech_recognizer()
         await _recognizer_cache.initialize()
     recognizer = _recognizer_cache
 
@@ -249,9 +249,19 @@ async def demo_orchestrator():
     )
     logger.info("Total pipeline completed in %.2f seconds", pipeline_elapsed)
 
+    # Format text for speech output at final TTS boundary
+    from app.speech_formatting import SpeechResponseFormatter
+    speech_formatter = SpeechResponseFormatter()
+    speech_text = speech_formatter.format(
+        result.response.message,
+        language=result.response.language,
+        transcription_language=result.transcription.language,
+    )
+
     # Synthesize the assistant's response to audio
+    logger.info("TTS INPUT: %s", speech_text)
     try:
-        audio_bytes = await tts.synthesize(result.response.message)
+        audio_bytes = await tts.synthesize(speech_text)
     except ValueError as exc:
         logger.error("TTS input validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -272,6 +282,7 @@ async def _synthesize_tts_helper(tts, text: str) -> bytes:
     Helper function to perform TTS synthesis with logging.
     """
     logger.info("TTS started")
+    logger.info("TTS INPUT: %s", text)
     try:
         audio_bytes = await tts.synthesize(text)
         logger.info("TTS completed")
@@ -300,7 +311,7 @@ async def websocket_audio(
     from input.models.audio_frame import AudioFrame
     from orchestration.orchestrator import Orchestrator
     from llm.rag_llm import RagLanguageModel
-    from input.stt.faster_whisper import FasterWhisperSTT
+    from input.stt import build_speech_recognizer
     import numpy as np
     import time
     import asyncio
@@ -308,7 +319,7 @@ async def websocket_audio(
     global _recognizer_cache, _llm_cache, _tts_cache
 
     if _recognizer_cache is None:
-        _recognizer_cache = FasterWhisperSTT()
+        _recognizer_cache = build_speech_recognizer()
         await _recognizer_cache.initialize()
     recognizer = _recognizer_cache
 
@@ -339,9 +350,17 @@ async def websocket_audio(
                 segment = await queue.get()
                 try:
                     result = await orchestrator.process_speech_segment(segment)
+
+                    from app.speech_formatting import SpeechResponseFormatter
+                    speech_formatter = SpeechResponseFormatter()
+                    speech_text = speech_formatter.format(
+                        result.response.message,
+                        language=result.response.language,
+                        transcription_language=result.transcription.language,
+                    )
                     
-                    # Generate TTS using the shared helper
-                    audio_bytes = await _synthesize_tts_helper(tts, result.response.message)
+                    # Generate TTS using formatted text at TTS boundary
+                    audio_bytes = await _synthesize_tts_helper(tts, speech_text)
                     
                     response_payload = {
                         "type": "assistant_response",

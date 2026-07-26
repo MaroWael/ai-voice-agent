@@ -46,6 +46,13 @@ class Settings(BaseSettings):
     # ==========================
     # Speech-to-Text (STT)
     # ==========================
+    # STT provider option: "local" | "groq"
+    # - "local": Uses FasterWhisper running locally (offline inference, private data, higher compute overhead/slower)
+    # - "groq": Uses Groq API Whisper model (faster inference, requires GROQ_API_KEY, sends audio payload externally)
+    STT_PROVIDER: str = "groq"
+    GROQ_STT_MODEL: str = "whisper-large-v3"
+    STT_FALLBACK_ENABLED: bool = True
+
     STT_MODEL: str = "medium"
     STT_DEVICE: str = "cpu"
     STT_COMPUTE_TYPE: str = "float32"

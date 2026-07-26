@@ -153,10 +153,14 @@ class RagLanguageModel(LanguageModel):
             len(rag_response.answer),
         )
 
+        from app.rag.builders.language_detector import detect_query_language
+        detected_lang = detect_query_language(question)
+        effective_lang = detected_lang if detected_lang else (transcription.language or "en")
+
         return AIResponse(
             action="rag",
             department=None,
             reason=rag_response.status.value,
             message=rag_response.answer,
-            language=transcription.language,
+            language=effective_lang,
         )
