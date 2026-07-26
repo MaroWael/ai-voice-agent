@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     SILMA_BASE_URL: str = ""
     SILMA_MODEL_ID: str = ""
     SILMA_VOICE_ID: str = ""
+    TTS_MAX_CHUNK_LENGTH: int = 180
 
     # ==========================
     # Embeddings

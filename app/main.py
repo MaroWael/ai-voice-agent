@@ -261,7 +261,7 @@ async def demo_orchestrator():
     # Synthesize the assistant's response to audio
     logger.info("TTS INPUT: %s", speech_text)
     try:
-        audio_bytes = await tts.synthesize(speech_text)
+        audio_bytes = await _synthesize_tts_helper(tts, speech_text)
     except ValueError as exc:
         logger.error("TTS input validation failed: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc))
@@ -279,20 +279,36 @@ async def demo_orchestrator():
 
 async def _synthesize_tts_helper(tts, text: str) -> bytes:
     """
-    Helper function to perform TTS synthesis with logging.
+    Helper function to perform TTS synthesis with SpeechChunker text splitting and audio chunk merging.
     """
-    logger.info("TTS started")
-    logger.info("TTS INPUT: %s", text)
-    try:
-        audio_bytes = await tts.synthesize(text)
-        logger.info("TTS completed")
-        return audio_bytes
-    except ValueError as exc:
-        logger.error("TTS input validation failed: %s", exc)
-        raise
-    except Exception as exc:
-        logger.exception("TTS synthesis failed: %s", exc)
-        raise
+    from app.speech_formatting.chunker import SpeechChunker
+    from app.tts.audio_utils import merge_audio_chunks
+
+    chunker = SpeechChunker()
+    chunks = chunker.split(text)
+
+    if not chunks:
+        logger.warning("SpeechChunker returned no chunks for text.")
+        return b""
+
+    logger.info("TTS Synthesis Started — Original length: %d chars, Chunks created: %d", len(text), len(chunks))
+
+    audio_chunks = []
+    for idx, chunk in enumerate(chunks, start=1):
+        logger.info("Synthesizing TTS Chunk %d/%d (%d chars): %r", idx, len(chunks), len(chunk), chunk)
+        try:
+            audio = await tts.synthesize(chunk)
+            audio_chunks.append(audio)
+        except ValueError as exc:
+            logger.error("TTS chunk %d input validation failed: %s", idx, exc)
+            raise
+        except Exception as exc:
+            logger.exception("TTS chunk %d synthesis failed: %s", idx, exc)
+            raise
+
+    merged_audio = merge_audio_chunks(audio_chunks)
+    logger.info("TTS Synthesis Completed — Merged %d chunk(s), Total audio bytes: %d", len(audio_chunks), len(merged_audio))
+    return merged_audio
 
 
 @app.websocket("/ws/audio")
