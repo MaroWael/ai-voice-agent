@@ -2,6 +2,7 @@ import logging
 from typing import List, Optional
 
 from app.speech_formatting.base import BaseTextNormalizer
+from app.speech_formatting.number_normalizer import NumberSpeechNormalizer
 from app.speech_formatting.normalizers import (
     MarkdownNormalizer,
     AbbreviationAndCurrencyNormalizer,
@@ -26,6 +27,7 @@ class SpeechResponseFormatter:
         self.normalizers: List[BaseTextNormalizer] = normalizers if normalizers is not None else [
             MarkdownNormalizer(),
             AbbreviationAndCurrencyNormalizer(),
+            NumberSpeechNormalizer(),
             PunctuationAndWhitespaceNormalizer(),
         ]
 

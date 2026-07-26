@@ -80,31 +80,31 @@ class TestSpeechResponseFormatter(unittest.TestCase):
 
     def test_english_currency_expansion_egp_250(self):
         text = "The issuance fee is EGP 250"
-        expected = "The issuance fee is 250 Egyptian Pounds"
+        expected = "The issuance fee is two hundred fifty Egyptian Pounds"
         result = self.formatter.format(text, language="en")
         self.assertEqual(result, expected)
 
     def test_english_currency_expansion_500(self):
         text = "Issuance fee: EGP 500"
-        expected = "Issuance fee: 500 Egyptian Pounds"
+        expected = "Issuance fee: five hundred Egyptian Pounds"
         result = self.formatter.format(text, language="en")
         self.assertEqual(result, expected)
 
     def test_english_le_expansion(self):
         text = "The renewal fee is 250 LE."
-        expected = "The renewal fee is 250 Egyptian Pounds."
+        expected = "The renewal fee is two hundred fifty Egyptian Pounds."
         result = self.formatter.format(text, language="en")
         self.assertEqual(result, expected)
 
     def test_arabic_currency_expansion(self):
         text = "رسوم الإصدار: EGP 500"
-        expected = "رسوم الإصدار: 500 جنيه مصري"
+        expected = "رسوم الإصدار: خمسمائة جنيه مصري"
         result = self.formatter.format(text, language="ar")
         self.assertEqual(result, expected)
 
     def test_arabic_currency_expansion_fallback_detection(self):
         text = "رسوم الإصدار: EGP 500"
-        expected = "رسوم الإصدار: 500 جنيه مصري"
+        expected = "رسوم الإصدار: خمسمائة جنيه مصري"
         result = self.formatter.format(text, language=None)
         self.assertEqual(result, expected)
 
@@ -115,7 +115,7 @@ class TestSpeechResponseFormatter(unittest.TestCase):
             language="ar",
             transcription_language="en"
         )
-        self.assertEqual(result, "رسوم الإصدار: 500 جنيه مصري")
+        self.assertEqual(result, "رسوم الإصدار: خمسمائة جنيه مصري")
 
     def test_transcription_language_fallback(self):
         text = "Issuance fee: EGP 500"
@@ -124,14 +124,14 @@ class TestSpeechResponseFormatter(unittest.TestCase):
             language=None,
             transcription_language="en"
         )
-        self.assertEqual(result, "Issuance fee: 500 Egyptian Pounds")
+        self.assertEqual(result, "Issuance fee: five hundred Egyptian Pounds")
 
     def test_markdown_and_bullet_cleanup(self):
         text = "**Fees**:\n• Issuance: EGP 500\n• Renewal: EGP 500"
         result = self.formatter.format(text, language="en")
         self.assertNotIn("**", result)
         self.assertNotIn("•", result)
-        self.assertIn("500 Egyptian Pounds", result)
+        self.assertIn("five hundred Egyptian Pounds", result)
 
     def test_empty_string_handling(self):
         result = self.formatter.format("")

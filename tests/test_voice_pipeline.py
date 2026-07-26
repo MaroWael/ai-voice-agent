@@ -91,7 +91,7 @@ class TestVoicePipelineIntegration(unittest.TestCase):
             sent_to_tts = self.tts.synthesized_texts[0]
             self.assertNotIn("•", sent_to_tts)
             self.assertNotIn("EGP 500", sent_to_tts)
-            self.assertIn("500 Egyptian Pounds", sent_to_tts)
+            self.assertIn("five hundred Egyptian Pounds", sent_to_tts)
 
         asyncio.run(run_test())
 
