@@ -325,7 +325,7 @@ async def websocket_audio(
     from input.vad.silero import SileroVAD
     from input.buffer.speech_buffer import SpeechBuffer
     from input.models.audio_frame import AudioFrame
-    from orchestration.orchestrator import Orchestrator
+    from orchestration.orchestrator import Orchestrator, OrchestratorResult
     from llm.rag_llm import RagLanguageModel
     from input.stt import build_speech_recognizer
     import numpy as np
@@ -365,19 +365,49 @@ async def websocket_audio(
             while True:
                 segment = await queue.get()
                 try:
-                    result = await orchestrator.process_speech_segment(segment)
+                    # 1. STT Transcribe
+                    start_stt = time.perf_counter()
+                    transcription = await orchestrator.recognizer.transcribe(segment)
+                    stt_elapsed = time.perf_counter() - start_stt
+                    logger.info("STT completed in %.2f seconds", stt_elapsed)
 
-                    from app.speech_formatting import SpeechResponseFormatter
-                    speech_formatter = SpeechResponseFormatter()
-                    speech_text = speech_formatter.format(
-                        result.response.message,
-                        language=result.response.language,
-                        transcription_language=result.transcription.language,
-                    )
-                    
-                    # Generate TTS using formatted text at TTS boundary
-                    audio_bytes = await _synthesize_tts_helper(tts, speech_text)
-                    
+                    # Send stt_result event immediately so User message renders with full transcript
+                    stt_payload = {
+                        "type": "stt_result",
+                        "transcription": transcription.text,
+                        "language": transcription.language,
+                    }
+                    try:
+                        await websocket.send_json(stt_payload)
+                    except (WebSocketDisconnect, RuntimeError) as send_err:
+                        logger.info("Client disconnected while sending STT payload. Worker exiting.")
+                        return
+
+                    # 2. LLM Generate
+                    start_llm = time.perf_counter()
+                    response = await orchestrator.llm.generate(transcription)
+                    llm_elapsed = time.perf_counter() - start_llm
+                    logger.info("LLM completed in %.2f seconds", llm_elapsed)
+
+                    result = OrchestratorResult(transcription=transcription, response=response)
+
+                    # 3. Perform TTS Synthesis (with Failsafe Error Handling)
+                    audio_bytes = None
+                    try:
+                        await websocket.send_json({"type": "tts_started"})
+                        from app.speech_formatting import SpeechResponseFormatter
+                        speech_formatter = SpeechResponseFormatter()
+                        speech_text = speech_formatter.format(
+                            result.response.message,
+                            language=result.response.language,
+                            transcription_language=result.transcription.language,
+                        )
+                        audio_bytes = await _synthesize_tts_helper(tts, speech_text)
+                    except Exception as tts_exc:
+                        logger.warning("TTS synthesis failed (failsafe mode triggered): %s", tts_exc)
+                        audio_bytes = None
+
+                    # 4. Send assistant_response JSON payload (held until audio is ready or TTS finishes)
                     response_payload = {
                         "type": "assistant_response",
                         "transcription": result.transcription.text,
@@ -387,21 +417,37 @@ async def websocket_audio(
                             "department": result.response.department,
                             "reason": result.response.reason,
                             "message": result.response.message
-                        }
+                        },
+                        "has_audio": bool(audio_bytes)
                     }
                     try:
                         await websocket.send_json(response_payload)
                     except (WebSocketDisconnect, RuntimeError) as send_err:
                         logger.info("Client disconnected while sending JSON response. Worker exiting.")
                         return
-                    
-                    logger.info("Sending audio")
-                    try:
-                        await websocket.send_bytes(audio_bytes)
-                        logger.info("Audio sent successfully")
-                    except (WebSocketDisconnect, RuntimeError) as send_err:
-                        logger.info("Client disconnected while sending audio bytes. Worker exiting.")
-                        return
+
+                    # 5. Send Audio Bytes if available; else send tts_failed
+                    if audio_bytes:
+                        logger.info("Sending audio")
+                        try:
+                            await websocket.send_bytes(audio_bytes)
+                            logger.info("Audio sent successfully")
+                        except (WebSocketDisconnect, RuntimeError) as send_err:
+                            logger.info("Client disconnected while sending audio bytes. Worker exiting.")
+                            return
+
+                        try:
+                            await websocket.send_json({"type": "tts_finished"})
+                        except (WebSocketDisconnect, RuntimeError) as send_err:
+                            logger.info("Client disconnected while sending tts_finished. Worker exiting.")
+                            return
+                    else:
+                        try:
+                            await websocket.send_json({"type": "tts_failed", "reason": "Audio synthesis unavailable"})
+                        except (WebSocketDisconnect, RuntimeError) as send_err:
+                            logger.info("Client disconnected while sending tts_failed. Worker exiting.")
+                            return
+
                 except Exception as exc:
                     logger.exception("Error during background speech processing: %s", exc)
                     try:

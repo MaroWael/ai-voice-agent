@@ -1,81 +1,117 @@
 /**
- * Voice AI — RAG Customer Service Demo Client
- *
- * Flow:
- *   1. Connect WebSocket to /ws/audio
- *   2. Capture microphone audio (float32, 1ch, native sample rate)
- *   3. Stream raw PCM frames to backend
- *   4. Backend: VAD → STT → RagService → Groq → TTS
- *   5. Receive JSON metadata then binary WAV audio
- *   6. Render transcript, RAG status, response text into debug panel
- *   7. Play WAV audio through Web Audio API + <audio> element
+ * Voice AI — Banque Misr Voice Banking Assistant Client
+ * Production Quality v6.0
  */
 
 'use strict';
 
 // ── DOM References ────────────────────────────────────────────────────────────
 
-const wsStatus       = document.getElementById('ws-status');
-const micStatus      = document.getElementById('mic-status');
+const wsStatus = document.getElementById('ws-status');
+const micStatus = document.getElementById('mic-status');
 const pipelineStatus = document.getElementById('pipeline-status');
-const wsUrlInput     = document.getElementById('ws-url');
+const wsUrlInput = document.getElementById('ws-url');
 
-const btnConnect    = document.getElementById('btn-connect');
+const btnConnect = document.getElementById('btn-connect');
 const btnDisconnect = document.getElementById('btn-disconnect');
-const btnMic        = document.getElementById('btn-mic');
-const micLabel      = document.getElementById('mic-label');
-const btnClear      = document.getElementById('btn-clear');
+const btnMic = document.getElementById('btn-mic');
+const micLabel = document.getElementById('mic-label');
+const btnClear = document.getElementById('btn-clear');
 const btnClearHistory = document.getElementById('btn-clear-history');
-const logArea       = document.getElementById('log-area');
+const logArea = document.getElementById('log-area');
 
 // Debug panel
-const transcriptText  = document.getElementById('transcript-text');
-const transcriptLang  = document.getElementById('transcript-lang');
-const ragStatusBadge  = document.getElementById('rag-status-badge');
-const responseText    = document.getElementById('response-text');
-const audioStatus     = document.getElementById('audio-status');
-const audioPlayer     = document.getElementById('audio-player');
-const turnCounter     = document.getElementById('turn-counter');
-const latTurn         = document.getElementById('lat-turn');
-const latAudio        = document.getElementById('lat-audio');
-const latRtt          = document.getElementById('lat-rtt');
+const transcriptText = document.getElementById('transcript-text');
+const transcriptLang = document.getElementById('transcript-lang');
+const ragStatusBadge = document.getElementById('rag-status-badge');
+const responseText = document.getElementById('response-text');
+const audioStatus = document.getElementById('audio-status');
+const audioPlayer = document.getElementById('audio-player');
+const turnCounter = document.getElementById('turn-counter');
+const latTurn = document.getElementById('lat-turn');
+const latAudio = document.getElementById('lat-audio');
+const latRtt = document.getElementById('lat-rtt');
 
-// History
-const historyArea     = document.getElementById('history-area');
+// History & Layout
+const historyArea = document.getElementById('history-area');
+const convArea = document.getElementById('conv-area');
+const callHero = document.getElementById('call-hero');
+const micHint = document.getElementById('mic-hint');
+const connDot = document.getElementById('conn-dot');
+const connLabel = document.getElementById('conn-label');
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
-let ws            = null;
-let audioContext  = null;
-let stream        = null;
-let sourceNode    = null;
+let ws = null;
+let audioContext = null;
+let stream = null;
+let sourceNode = null;
 let processorNode = null;
-let isRecording   = false;
+let isRecording = false;
 
-// Pending state between JSON message and subsequent binary audio
-let pendingMeta   = null;   // last received assistant_response JSON
+let pendingMeta = null;   // last received assistant_response JSON
 let turnSegmentStart = null; // monotonic timestamp when segment was sent
-
-let turnCount     = 0;
+let turnCount = 0;
 
 // ── Event Bindings ────────────────────────────────────────────────────────────
 
-btnConnect.addEventListener('click', connect);
-btnDisconnect.addEventListener('click', disconnect);
-btnMic.addEventListener('click', toggleRecording);
-btnClear.addEventListener('click', () => {
-    logArea.innerHTML = '';
-    log('Log cleared.', 'system');
-});
-btnClearHistory.addEventListener('click', () => {
-    historyArea.innerHTML = '<div class="history-empty">No turns yet.</div>';
-    turnCount = 0;
-    turnCounter.textContent = '—';
-});
+if (btnConnect) btnConnect.addEventListener('click', connect);
+if (btnDisconnect) btnDisconnect.addEventListener('click', disconnect);
+if (btnMic) btnMic.addEventListener('click', toggleRecording);
+
+if (btnClear) {
+    btnClear.addEventListener('click', () => {
+        logArea.innerHTML = '';
+        log('Log cleared.', 'system');
+    });
+}
+
+if (btnClearHistory) {
+    btnClearHistory.addEventListener('click', () => {
+        historyArea.innerHTML = `
+            <div class="history-empty">
+                <svg class="empty-icon" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18 2L33 10.5V25.5L18 34L3 25.5V10.5L18 2Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                    <circle cx="18" cy="18" r="5" fill="currentColor" opacity="0.9"/>
+                </svg>
+                <div class="empty-title">Banque Misr Voice Assistant</div>
+                <div class="empty-subtitle">Your conversation will appear here.<br>Ask me about accounts, certificates, transfers, loans, or banking services.</div>
+            </div>
+        `;
+        turnCount = 0;
+        if (turnCounter) turnCounter.textContent = '—';
+        if (callHero) callHero.style.display = 'flex';
+        if (convArea) convArea.style.display = 'none';
+    });
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function scrollToBottom() {
+    if (!historyArea) return;
+    requestAnimationFrame(() => {
+        historyArea.scrollTo({
+            top: historyArea.scrollHeight,
+            behavior: 'smooth'
+        });
+    });
+}
+
+function ensureConversationView() {
+    if (callHero) callHero.style.display = 'none';
+    if (convArea) convArea.style.display = 'flex';
+    const emptyState = historyArea.querySelector('.history-empty');
+    if (emptyState) emptyState.remove();
+}
+
+function updateHint(message) {
+    if (micHint) micHint.textContent = message;
+}
 
 // ── Logging ───────────────────────────────────────────────────────────────────
 
 function log(message, type = 'system') {
+    if (!logArea) return;
     const entry = document.createElement('div');
     entry.className = `log-entry ${type}`;
     const time = new Date().toLocaleTimeString();
@@ -87,10 +123,9 @@ function log(message, type = 'system') {
 // ── WebSocket ─────────────────────────────────────────────────────────────────
 
 async function connect() {
-    const url = wsUrlInput.value.trim();
+    const url = wsUrlInput ? wsUrlInput.value.trim() : 'ws://127.0.0.1:8000/ws/audio';
     if (!url) { log('WebSocket URL is empty.', 'error'); return; }
 
-    // AudioContext must be created (or resumed) from a user gesture
     try {
         if (audioContext) await audioContext.close();
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -103,7 +138,7 @@ async function connect() {
     const fullUrl = `${url}?sample_rate=${sampleRate}&channels=1&format=float32`;
 
     log(`Connecting → ${fullUrl}`);
-    btnConnect.disabled = true;
+    if (btnConnect) btnConnect.disabled = true;
     setWsStatus('connecting');
 
     try {
@@ -113,9 +148,10 @@ async function connect() {
         ws.onopen = () => {
             log('WebSocket connected.', 'success');
             setWsStatus('connected');
-            btnDisconnect.disabled = false;
-            btnMic.disabled = false;
-            wsUrlInput.disabled = true;
+            if (btnDisconnect) btnDisconnect.disabled = false;
+            if (btnMic) btnMic.disabled = false;
+            if (wsUrlInput) wsUrlInput.disabled = true;
+            updateHint('Tap microphone to speak with Banque Misr');
         };
 
         ws.onclose = (e) => {
@@ -124,14 +160,14 @@ async function connect() {
         };
 
         ws.onerror = () => {
-            log('WebSocket error. Is the server running?', 'error');
+            log('WebSocket error. Is the backend server running?', 'error');
         };
 
         ws.onmessage = handleServerMessage;
 
     } catch (err) {
         log(`Connection failed: ${err.message}`, 'error');
-        btnConnect.disabled = false;
+        if (btnConnect) btnConnect.disabled = false;
         setWsStatus('disconnected');
     }
 }
@@ -145,12 +181,13 @@ async function disconnect() {
 function handleCleanup() {
     ws = null;
     setWsStatus('disconnected');
-    btnConnect.disabled = false;
-    btnDisconnect.disabled = true;
-    btnMic.disabled = true;
-    wsUrlInput.disabled = false;
+    if (btnConnect) btnConnect.disabled = false;
+    if (btnDisconnect) btnDisconnect.disabled = true;
+    if (btnMic) btnMic.disabled = true;
+    if (wsUrlInput) wsUrlInput.disabled = false;
     if (isRecording) stopRecording();
     setPipelineStatus('idle');
+    updateHint('Connect to start your session');
 }
 
 // ── Server Message Handler ─────────────────────────────────────────────────────
@@ -164,33 +201,148 @@ async function handleServerMessage(event) {
             return;
         }
 
+        // ── 1. STT Result ──
+        if (payload.type === 'stt_result') {
+            const transcript = payload.transcription || 'Voice request';
+            const lang = payload.language || '';
+
+            log(`STT → "${transcript}"`, 'transcript');
+            if (transcriptText) transcriptText.textContent = transcript;
+            if (transcriptLang) transcriptLang.textContent = lang ? `Language: ${lang}` : '';
+
+            ensureConversationView();
+
+            // Render User bubble immediately with full STT transcript (no loading dots)
+            const userRow = document.createElement('div');
+            userRow.className = 'chat-row row-user';
+            userRow.innerHTML = `
+                <div class="chat-bubble user-bubble" dir="auto">${escapeHtml(transcript)}</div>
+                <div class="avatar-chip user-chip">You</div>
+            `;
+            historyArea.appendChild(userRow);
+
+            // Create Assistant typing indicator bubble placeholder (🤖 ● ● ●)
+            const aiRow = document.createElement('div');
+            aiRow.className = 'chat-row row-ai';
+            aiRow.id = 'current-ai-placeholder';
+            aiRow.innerHTML = `
+                <div class="avatar-chip ai-chip" aria-hidden="true">
+                    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+                        <path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z"/>
+                        <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+                    </svg>
+                </div>
+                <div class="chat-bubble ai-bubble" dir="auto">
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
+                </div>
+            `;
+            historyArea.appendChild(aiRow);
+
+            setPipelineStatus('processing');
+            updateHint('🧠 Thinking...');
+            scrollToBottom();
+            return;
+        }
+
+        // ── 2. Assistant Response (LLM Generated) ──
         if (payload.type === 'assistant_response') {
             pendingMeta = payload;
             turnSegmentStart = Date.now();
 
-            const transcript = payload.transcription || '—';
-            const lang       = payload.language || '';
-            const action     = payload.response?.action || '—';
-            const reason     = payload.response?.reason || '—';
-            const message    = payload.response?.message || '—';
+            const transcript = payload.transcription || 'Voice request';
+            const lang = payload.language || '';
+            const reason = payload.response?.reason || '—';
+            const message = payload.response?.message || 'I am ready to assist you.';
 
-            log(`STT → "${transcript}"`, 'transcript');
-            log(`RAG → ${reason.toUpperCase()} | ${message.substring(0, 60)}${message.length > 60 ? '…' : ''}`, 'rag');
+            log(`RAG → ${reason.toUpperCase()} | ${message.substring(0, 60)}…`, 'rag');
 
             // Update debug panel
-            transcriptText.textContent = transcript;
-            transcriptLang.textContent = lang ? `Language: ${lang}` : '';
+            if (transcriptText) transcriptText.textContent = transcript;
+            if (transcriptLang) transcriptLang.textContent = lang ? `Language: ${lang}` : '';
             renderRagStatus(reason);
-            responseText.textContent = message;
-            responseText.setAttribute('dir', 'auto');
-            audioStatus.textContent = 'Waiting for audio…';
-            audioPlayer.style.display = 'none';
-            setPipelineStatus('processing');
+            if (responseText) {
+                responseText.textContent = message;
+                responseText.setAttribute('dir', 'auto');
+            }
+
+            // Failsafe Mode: If audio is unavailable, display text immediately
+            if (payload.has_audio === false) {
+                requestAnimationFrame(() => {
+                    ensureConversationView();
+                    const activeAiPlaceholder = document.getElementById('current-ai-placeholder');
+                    if (activeAiPlaceholder) {
+                        const activeAiBubble = activeAiPlaceholder.querySelector('.ai-bubble');
+                        if (activeAiBubble) {
+                            activeAiBubble.innerHTML = escapeHtml(message);
+                        }
+                        activeAiPlaceholder.removeAttribute('id');
+                    } else {
+                        const userRow = document.createElement('div');
+                        userRow.className = 'chat-row row-user';
+                        userRow.innerHTML = `
+                            <div class="chat-bubble user-bubble" dir="auto">${escapeHtml(transcript)}</div>
+                            <div class="avatar-chip user-chip">You</div>
+                        `;
+                        historyArea.appendChild(userRow);
+
+                        const aiRow = document.createElement('div');
+                        aiRow.className = 'chat-row row-ai';
+                        aiRow.innerHTML = `
+                            <div class="avatar-chip ai-chip" aria-hidden="true">
+                                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+                                    <path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z"/>
+                                    <circle cx="8" cy="8" r="2.5" fill="currentColor"/>
+                                </svg>
+                            </div>
+                            <div class="chat-bubble ai-bubble" dir="auto">${escapeHtml(message)}</div>
+                        `;
+                        historyArea.appendChild(aiRow);
+                    }
+                    setPipelineStatus('idle');
+                    updateHint('✨ Ready for your next question (Audio unavailable)');
+                    scrollToBottom();
+                });
+            }
+            // If has_audio is true, text replacement is held for requestAnimationFrame when binary audio arrives!
+            return;
         }
+
+        // ── 3. TTS Started Event ──
+        if (payload.type === 'tts_started') {
+            log('TTS synthesis started…', 'system');
+            return;
+        }
+
+        // ── 4. TTS Finished Event ──
+        if (payload.type === 'tts_finished') {
+            log('TTS synthesis finished.', 'system');
+            return;
+        }
+
+        // ── 5. TTS Failed Event (Failsafe fallback) ──
+        if (payload.type === 'tts_failed') {
+            log(`TTS synthesis failed: ${payload.reason || 'Audio unavailable'}`, 'warn');
+            requestAnimationFrame(() => {
+                const activeAiPlaceholder = document.getElementById('current-ai-placeholder');
+                if (activeAiPlaceholder && pendingMeta) {
+                    const activeAiBubble = activeAiPlaceholder.querySelector('.ai-bubble');
+                    if (activeAiBubble) {
+                        const msgText = pendingMeta.response?.message || 'I am ready to assist you.';
+                        activeAiBubble.innerHTML = escapeHtml(msgText);
+                    }
+                    activeAiPlaceholder.removeAttribute('id');
+                }
+                setPipelineStatus('idle');
+                updateHint('✨ Ready for your next question (Audio unavailable)');
+                scrollToBottom();
+            });
+            return;
+        }
+
         return;
     }
 
-    // ── Binary WAV audio ─────────────────────────────────────────────────────
+    // ── Binary WAV audio (Atomic UI Update: Text Replacement + Audio Start) ──
     if (event.data instanceof ArrayBuffer) {
         const byteLen = event.data.byteLength;
         log(`Audio received: ${formatBytes(byteLen)}`, 'success');
@@ -198,24 +350,32 @@ async function handleServerMessage(event) {
         const rtt = turnSegmentStart ? `${(Date.now() - turnSegmentStart).toLocaleString()} ms` : '—';
 
         turnCount += 1;
-        turnCounter.textContent = `Turn ${turnCount}`;
-        latTurn.textContent  = `#${turnCount}`;
-        latAudio.textContent = formatBytes(byteLen);
-        latRtt.textContent   = rtt;
+        if (turnCounter) turnCounter.textContent = `Turn ${turnCount}`;
+        if (latTurn) latTurn.textContent = `#${turnCount}`;
+        if (latAudio) latAudio.textContent = formatBytes(byteLen);
+        if (latRtt) latRtt.textContent = rtt;
 
-        audioStatus.textContent = `Playing audio… (${formatBytes(byteLen)})`;
-        setPipelineStatus('playing');
+        // ATOMIC UI UPDATE inside requestAnimationFrame:
+        // Replace typing dots with text AND trigger audio playback in the EXACT SAME UI FRAME!
+        requestAnimationFrame(() => {
+            ensureConversationView();
+            const activeAiPlaceholder = document.getElementById('current-ai-placeholder');
+            if (activeAiPlaceholder && pendingMeta) {
+                const activeAiBubble = activeAiPlaceholder.querySelector('.ai-bubble');
+                if (activeAiBubble) {
+                    const msgText = pendingMeta.response?.message || 'I am ready to assist you.';
+                    activeAiBubble.innerHTML = escapeHtml(msgText);
+                }
+                activeAiPlaceholder.removeAttribute('id');
+            }
 
-        await playWavBuffer(event.data);
+            setPipelineStatus('playing');
+            updateHint('🔊 Banque Misr AI is speaking...');
+            scrollToBottom();
 
-        // Add to history
-        if (pendingMeta) {
-            addHistoryTurn(pendingMeta, byteLen, rtt);
+            playWavBuffer(event.data);
             pendingMeta = null;
-        }
-
-        setPipelineStatus('idle');
-        audioStatus.textContent = `Last audio: ${formatBytes(byteLen)} — played successfully ✓`;
+        });
         return;
     }
 
@@ -225,32 +385,30 @@ async function handleServerMessage(event) {
 // ── Audio Playback ────────────────────────────────────────────────────────────
 
 async function playWavBuffer(arrayBuffer) {
-    // Use <audio> element with Blob URL for reliable WAV playback
     try {
         const blob = new Blob([arrayBuffer], { type: 'audio/wav' });
-        const url  = URL.createObjectURL(blob);
+        const url = URL.createObjectURL(blob);
 
-        audioPlayer.src = url;
-        audioPlayer.style.display = 'block';
+        if (audioPlayer) {
+            audioPlayer.src = url;
+            audioPlayer.style.display = 'block';
 
-        // Auto-play and log when done
-        audioPlayer.onended = () => {
-            URL.revokeObjectURL(url);
-            log('Audio playback finished.', 'system');
-        };
-        audioPlayer.onerror = (e) => {
-            log(`Audio playback error: ${audioPlayer.error?.message || 'unknown'}`, 'error');
-        };
+            audioPlayer.onended = () => {
+                URL.revokeObjectURL(url);
+                log('Audio playback finished.', 'system');
+                setPipelineStatus('idle');
+                updateHint('✨ Ready for your next question');
+            };
 
-        try {
-            await audioPlayer.play();
-            log('Playing synthesized audio…', 'success');
-        } catch (playErr) {
-            // Browser autoplay policy — audio element is still shown, user can press play
-            log(`Autoplay blocked — use the player below to listen. (${playErr.message})`, 'warn');
+            try {
+                await audioPlayer.play();
+                log('Playing synthesized audio…', 'success');
+            } catch (playErr) {
+                log(`Autoplay blocked (${playErr.message})`, 'warn');
+            }
         }
     } catch (err) {
-        log(`Failed to prepare audio: ${err.message}`, 'error');
+        log(`Failed to play audio: ${err.message}`, 'error');
     }
 }
 
@@ -286,16 +444,18 @@ async function startRecording() {
         return;
     }
 
-    log('Microphone active — streaming to backend…', 'success');
+    log('Microphone active — streaming audio…', 'success');
     isRecording = true;
     setMicStatus('active');
     btnMic.classList.add('recording');
-    micLabel.textContent = 'Stop Recording';
-    btnDisconnect.disabled = true;
+    if (micLabel) micLabel.textContent = 'Stop Recording';
+    if (btnDisconnect) btnDisconnect.disabled = true;
+
     setPipelineStatus('listening');
+    updateHint('🎤 Listening... Tap microphone when finished');
 
     await audioContext.resume();
-    sourceNode    = audioContext.createMediaStreamSource(stream);
+    sourceNode = audioContext.createMediaStreamSource(stream);
     processorNode = audioContext.createScriptProcessor(2048, 1, 1);
 
     processorNode.onaudioprocess = (e) => {
@@ -310,11 +470,12 @@ async function startRecording() {
 }
 
 function stopRecording() {
+    if (!isRecording) return;
     isRecording = false;
     setMicStatus('inactive');
     btnMic.classList.remove('recording');
-    micLabel.textContent = 'Start Recording';
-    btnDisconnect.disabled = false;
+    if (micLabel) micLabel.textContent = 'Start Recording';
+    if (btnDisconnect) btnDisconnect.disabled = false;
 
     if (processorNode) {
         processorNode.disconnect();
@@ -322,70 +483,51 @@ function stopRecording() {
         processorNode = null;
     }
     if (sourceNode) { sourceNode.disconnect(); sourceNode = null; }
-    if (stream)     { stream.getTracks().forEach(t => t.stop()); stream = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 
-    log('Recording stopped.', 'system');
-    setPipelineStatus('idle');
+    log('Recording stopped — processing user turn…', 'system');
+    setPipelineStatus('processing');
+    updateHint('🧠 Thinking...');
 }
 
-// ── History ───────────────────────────────────────────────────────────────────
-
-function addHistoryTurn(meta, audioBytes, rtt) {
-    const empty = historyArea.querySelector('.history-empty');
-    if (empty) empty.remove();
-
-    const reason  = meta.response?.reason  || '—';
-    const message = meta.response?.message || '—';
-    const transcript = meta.transcription || '—';
-    const lang    = meta.language || '';
-
-    const item = document.createElement('div');
-    item.className = 'history-turn';
-    item.innerHTML = `
-        <div class="history-turn-header">
-            <span class="history-turn-num">Turn ${turnCount}</span>
-            <span class="history-rtt">${rtt}</span>
-            <span class="history-rag-badge ${ragBadgeClass(reason)}">${reason.toUpperCase()}</span>
-        </div>
-        <div class="history-q" dir="auto">${escapeHtml(transcript)}<span class="history-lang">${lang ? ` [${lang}]` : ''}</span></div>
-        <div class="history-a" dir="auto">${escapeHtml(message)}</div>
-    `;
-    historyArea.prepend(item);
-}
-
-// ── UI Helpers ────────────────────────────────────────────────────────────────
+// ── UI Status Updates ─────────────────────────────────────────────────────────
 
 function setWsStatus(state) {
     const labels = { connecting: 'Connecting…', connected: 'Connected', disconnected: 'Disconnected' };
-    wsStatus.textContent  = labels[state] || state;
-    wsStatus.className    = `status-badge ${state}`;
+    if (wsStatus) {
+        wsStatus.textContent = labels[state] || state;
+        wsStatus.className = `status-badge ${state}`;
+    }
+    if (connDot) connDot.className = `conn-dot ${state === 'connected' ? 'connected' : state === 'connecting' ? 'connecting' : ''}`;
+    if (connLabel) connLabel.textContent = state === 'connected' ? 'Connected to Banque Misr' : labels[state] || state;
 }
 
 function setMicStatus(state) {
-    micStatus.textContent = state === 'active' ? 'Recording' : 'Inactive';
-    micStatus.className   = `status-badge ${state === 'active' ? 'active' : 'inactive'}`;
+    if (micStatus) {
+        micStatus.textContent = state === 'active' ? 'Recording' : 'Inactive';
+        micStatus.className = `status-badge ${state === 'active' ? 'active' : 'inactive'}`;
+    }
 }
 
 function setPipelineStatus(state) {
     const map = {
-        idle:       ['Idle',       'inactive'],
-        listening:  ['Listening',  'active'],
-        processing: ['Processing', 'processing'],
-        playing:    ['Playing',    'playing'],
+        idle: ['Ready', 'inactive'],
+        listening: ['Listening', 'active'],
+        processing: ['Thinking', 'processing'],
+        playing: ['Speaking', 'playing'],
     };
-    const [label, cls] = map[state] || ['—', 'inactive'];
-    pipelineStatus.textContent = label;
-    pipelineStatus.className   = `status-badge ${cls}`;
+    const [label, cls] = map[state] || ['Ready', 'inactive'];
+    if (pipelineStatus) {
+        pipelineStatus.textContent = label;
+        pipelineStatus.className = `status-badge ${cls}`;
+    }
 }
 
 function renderRagStatus(reason) {
+    if (!ragStatusBadge) return;
     const isSuccess = reason === 'success';
     ragStatusBadge.textContent = reason ? reason.replace(/_/g, ' ').toUpperCase() : '—';
-    ragStatusBadge.className   = `rag-status-value ${isSuccess ? 'rag-success' : 'rag-refusal'}`;
-}
-
-function ragBadgeClass(reason) {
-    return reason === 'success' ? 'badge-success' : 'badge-refusal';
+    ragStatusBadge.className = `rag-status-value ${isSuccess ? 'rag-success' : 'rag-refusal'}`;
 }
 
 function formatBytes(bytes) {
