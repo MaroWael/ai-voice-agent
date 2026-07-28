@@ -225,7 +225,10 @@ async def demo_orchestrator():
     vad = SileroVAD(threshold=0.5)
     buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
 
-    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer, llm, tts)
+    from app.conversation import ConversationManager
+    conv_mgr = ConversationManager()
+
+    orchestrator = Orchestrator(source, adapter, vad, buffer, recognizer, llm, tts, conversation_manager=conv_mgr)
 
     logger.info("Orchestrator Started")
     logger.info("Listening...")
@@ -314,12 +317,13 @@ async def _synthesize_tts_helper(tts, text: str) -> bytes:
 @app.websocket("/ws/audio")
 async def websocket_audio(
     websocket: WebSocket,
+    session_id: str = "default_session",
     sample_rate: int = 16000,
     channels: int = 1,
     format: Literal["int16", "float32"] = "int16"
 ):
     await websocket.accept()
-    logger.info("WebSocket connection accepted: sample_rate=%d, channels=%d, format=%s", sample_rate, channels, format)
+    logger.info("WebSocket connection accepted: session_id=%s, sample_rate=%d, channels=%d, format=%s", session_id, sample_rate, channels, format)
 
     from input.adapter.audio_frame_adapter import AudioFrameAdapter
     from input.vad.silero import SileroVAD
@@ -328,6 +332,7 @@ async def websocket_audio(
     from orchestration.orchestrator import Orchestrator, OrchestratorResult
     from llm.rag_llm import RagLanguageModel
     from input.stt import build_speech_recognizer
+    from app.conversation import ConversationManager
     import numpy as np
     import time
     import asyncio
@@ -353,8 +358,10 @@ async def websocket_audio(
     vad = SileroVAD(threshold=0.5)
     buffer = SpeechBuffer(max_silence_duration_ms=1000, pre_speech_padding_ms=200)
     
-    # Instantiate Orchestrator (without audio_source for WebSocket streaming)
-    orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm, tts)
+    conversation_manager = ConversationManager()
+    
+    # Instantiate Orchestrator with ConversationManager lifecycle owner
+    orchestrator = Orchestrator(None, adapter, vad, buffer, recognizer, llm, tts, conversation_manager=conversation_manager)
 
     # Bounded queue of size 3 for completed speech segments
     queue = asyncio.Queue(maxsize=3)
@@ -365,31 +372,20 @@ async def websocket_audio(
             while True:
                 segment = await queue.get()
                 try:
-                    # 1. STT Transcribe
-                    start_stt = time.perf_counter()
-                    transcription = await orchestrator.recognizer.transcribe(segment)
-                    stt_elapsed = time.perf_counter() - start_stt
-                    logger.info("STT completed in %.2f seconds", stt_elapsed)
+                    # Execute full Orchestrator turn (STT -> ConversationManager -> Router / RAG)
+                    result = await orchestrator.process_speech_segment(segment, session_id=session_id)
 
                     # Send stt_result event immediately so User message renders with full transcript
                     stt_payload = {
                         "type": "stt_result",
-                        "transcription": transcription.text,
-                        "language": transcription.language,
+                        "transcription": result.transcription.text,
+                        "language": result.transcription.language,
                     }
                     try:
                         await websocket.send_json(stt_payload)
                     except (WebSocketDisconnect, RuntimeError) as send_err:
                         logger.info("Client disconnected while sending STT payload. Worker exiting.")
                         return
-
-                    # 2. LLM Generate
-                    start_llm = time.perf_counter()
-                    response = await orchestrator.llm.generate(transcription)
-                    llm_elapsed = time.perf_counter() - start_llm
-                    logger.info("LLM completed in %.2f seconds", llm_elapsed)
-
-                    result = OrchestratorResult(transcription=transcription, response=response)
 
                     # 3. Perform TTS Synthesis (with Failsafe Error Handling)
                     audio_bytes = None

@@ -70,9 +70,29 @@ class GroqWhisperSTT(SpeechRecognizer):
         logger.info("Transcription started using Groq Whisper")
         start_time = time.perf_counter()
 
+        duration_sec = len(segment.samples) / segment.sample_rate if segment.sample_rate > 0 else 0.0
+        first_20 = segment.samples[:20].tolist() if len(segment.samples) >= 20 else segment.samples.tolist()
+        last_20 = segment.samples[-20:].tolist() if len(segment.samples) >= 20 else segment.samples.tolist()
+
         try:
             wav_bytes = audio_samples_to_wav_bytes(segment.samples, segment.sample_rate)
             file_tuple = ("speech.wav", wav_bytes, "audio/wav")
+
+            logger.info(
+                "STT DIAGNOSTICS:\n"
+                "  Audio Duration:    %.3f seconds\n"
+                "  Sample Count:      %d samples\n"
+                "  Sample Rate:       %d Hz\n"
+                "  WAV Size:          %d bytes\n"
+                "  First 20 Samples:  %s\n"
+                "  Last 20 Samples:   %s",
+                duration_sec,
+                len(segment.samples),
+                segment.sample_rate,
+                len(wav_bytes),
+                [round(s, 5) for s in first_20],
+                [round(s, 5) for s in last_20],
+            )
 
             response = await self._client.audio.transcriptions.create(
                 file=file_tuple,
@@ -85,7 +105,6 @@ class GroqWhisperSTT(SpeechRecognizer):
             raise STTProviderError(f"Groq Whisper transcription failed: {exc}") from exc
 
         elapsed = time.perf_counter() - start_time
-        logger.info("STT completed in %.2f seconds using Groq Whisper", elapsed)
 
         # Safe mapping & language normalization
         text = getattr(response, "text", "") or ""
@@ -95,12 +114,22 @@ class GroqWhisperSTT(SpeechRecognizer):
         from input.stt.language_normalizer import normalize_stt_language
         normalized_language = normalize_stt_language(text, raw_language)
 
+        logger.info(
+            "STT RESULT:\n"
+            "  Transcript:        %r\n"
+            "  Detected Language: %s (Raw: %s)\n"
+            "  Groq Latency:      %.3f seconds",
+            text,
+            normalized_language,
+            raw_language,
+            elapsed,
+        )
+
         start_ts = segment.start_timestamp if segment.start_timestamp is not None else 0.0
         if segment.end_timestamp is not None and segment.end_timestamp > start_ts:
             end_ts = segment.end_timestamp
         else:
-            duration = len(segment.samples) / segment.sample_rate if segment.sample_rate > 0 else 0.0
-            end_ts = start_ts + duration
+            end_ts = start_ts + duration_sec
 
         return Transcription(
             text=text,

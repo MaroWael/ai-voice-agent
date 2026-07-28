@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     # ==========================
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
+    REDIS_SESSION_TTL_SECONDS: int = 1200
+    MAX_CONVERSATION_TURNS: int = 3
+    SUMMARY_UPDATE_INTERVAL_TURNS: int = 3
 
     # ==========================
     # Qdrant

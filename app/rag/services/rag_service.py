@@ -79,21 +79,33 @@ class RagService:
         question: str,
         top_k: int | None = None,
         debug: bool | None = None,
+        conversation_context: str = "",
+        standalone_query: str = "",
     ) -> RagResponse:
         """
         Execute the RAG pipeline and return a structured response.
+        If standalone_query is provided (from ConversationQueryRewriter), it is used exclusively
+        for query normalization, vector retrieval, and unknown detection.
+        Original question and conversation_context are injected only at Step 5 Prompt Generation.
         """
         is_debug = debug if debug is not None else settings.RAG_DEBUG
-        logger.info("RAG pipeline started for question: %r (debug=%s)", question, is_debug)
+        query_for_retrieval = standalone_query if standalone_query else question
+        logger.info(
+            "RAG pipeline started — question: %r (standalone=%r, context_len=%d, debug=%s)",
+            question,
+            standalone_query,
+            len(conversation_context),
+            is_debug,
+        )
 
         t_total_start = time.perf_counter()
 
         # ── Step 1: Query Normalization ───────────────────────────────────────
         t0 = time.perf_counter()
-        normalized_query = await self._query_normalizer.normalize(question)
+        normalized_query = await self._query_normalizer.normalize(query_for_retrieval)
         t_norm_ms = (time.perf_counter() - t0) * 1000.0
 
-        retrieval_query = normalized_query if normalized_query else question
+        retrieval_query = normalized_query if normalized_query else query_for_retrieval
 
         # ── Step 2: Translation (Optional abstraction layer) ──────────────────
         t_trans_start = time.perf_counter()
@@ -113,7 +125,7 @@ class RagService:
 
         # ── Step 4: First-Pass Unknown Answer Detection ───────────────────────
         t2 = time.perf_counter()
-        detection = await self._unknown_detector.evaluate(question, retrieved_docs)
+        detection = await self._unknown_detector.evaluate(query_for_retrieval, retrieved_docs)
         t_detect_ms = (time.perf_counter() - t2) * 1000.0
 
         t_enhance_ms = 0.0
@@ -217,8 +229,13 @@ class RagService:
             )
 
         # ── Step 5: Context & Prompt ──────────────────────────────────────────
-        context = self._context_builder.build_context(retrieved_docs, question=question)
-        prompt = self._prompt_builder.build_prompt(question, context)
+        retrieved_context = self._context_builder.build_context(retrieved_docs, question=question)
+        final_context = (
+            f"{conversation_context}\n\n{retrieved_context}"
+            if conversation_context
+            else retrieved_context
+        )
+        prompt = self._prompt_builder.build_prompt(question, final_context)
 
         # ── Step 6: LLM Generation ────────────────────────────────────────────
         t3 = time.perf_counter()
@@ -242,7 +259,7 @@ class RagService:
                     )
                     for r in retrieved_docs
                 ],
-                final_context=context,
+                final_context=final_context,
                 prompt_length_chars=len(prompt),
                 latencies_ms={
                     "normalization": round(t_norm_ms, 2),

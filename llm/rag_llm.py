@@ -75,21 +75,15 @@ class RagLanguageModel(LanguageModel):
     # Generation
     # ------------------------------------------------------------------
 
-    async def generate(self, transcription: Transcription) -> AIResponse:
+    async def generate(
+        self,
+        transcription: Transcription,
+        conversation_context: str = "",
+        standalone_query: str = "",
+    ) -> AIResponse:
         """
         Passes the transcribed user text through the RAG pipeline and returns
         a fully populated AIResponse compatible with the Orchestrator contract.
-
-        Mapping:
-            RagStatus.SUCCESS              → action="rag"
-            RagStatus.INSUFFICIENT_CONTEXT → action="rag"  (refusal answer)
-            Any exception                  → re-raised
-
-        Args:
-            transcription: Output of FasterWhisperSTT containing .text and .language.
-
-        Returns:
-            AIResponse with action, department, reason, message fields populated.
         """
         if self._rag_service is None or not self._initialized:
             raise RuntimeError(
@@ -97,12 +91,17 @@ class RagLanguageModel(LanguageModel):
             )
 
         question = transcription.text
-        logger.info("RagLanguageModel.generate() — question: %r", question)
+        logger.info("RagLanguageModel.generate() — question: %r (standalone=%r, context_len=%d)", question, standalone_query, len(conversation_context))
 
         from app.rag.models.status import RagStatus
         from app.config.settings import settings
 
-        rag_response = await self._rag_service.answer(question, debug=True)
+        rag_response = await self._rag_service.answer(
+            question=question,
+            conversation_context=conversation_context,
+            standalone_query=standalone_query,
+            debug=True,
+        )
 
         debug = rag_response.debug_info
         min_score = settings.UNKNOWN_DETECTOR_MIN_SCORE

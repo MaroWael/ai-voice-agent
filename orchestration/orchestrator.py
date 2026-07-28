@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Optional
 from input.sources.base import AudioSource
 from input.adapter.audio_frame_adapter import AudioFrameAdapter
 from input.vad.base import VoiceActivityDetector
@@ -38,6 +38,7 @@ class Orchestrator:
         recognizer: SpeechRecognizer,
         llm: LanguageModel,
         tts: SpeechSynthesizer,
+        conversation_manager: Optional[Any] = None,
     ) -> None:
         self.audio_source = audio_source
         self.adapter = adapter
@@ -46,6 +47,7 @@ class Orchestrator:
         self.recognizer = recognizer
         self.llm = llm
         self.tts = tts
+        self.conversation_manager = conversation_manager
 
     async def receive_audio_frame(self, frame: AudioFrame) -> Optional[SpeechSegment]:
         """
@@ -62,9 +64,13 @@ class Orchestrator:
             return segment
         return None
 
-    async def process_speech_segment(self, segment: SpeechSegment) -> OrchestratorResult:
+    async def process_speech_segment(
+        self,
+        segment: SpeechSegment,
+        session_id: str = "default_session",
+    ) -> OrchestratorResult:
         """
-        Processes a completed SpeechSegment. Transcribes it and runs the LLM router.
+        Processes a completed SpeechSegment. Transcribes it and runs intent routing/LLM execution.
         """
         import time
         start_stt = time.perf_counter()
@@ -77,12 +83,28 @@ class Orchestrator:
         logger.info("Text: %s", transcription.text)
         logger.info("Language: %s", transcription.language)
         logger.info("==================")
-        response = await self.llm.generate(transcription)
-        logger.info("=== LLM OUTPUT ===")
+
+        if self.conversation_manager is not None:
+            async def _rag_executor(trans: Transcription, conv_ctx: str, standalone_q: str) -> AIResponse:
+                return await self.llm.generate(
+                    trans,
+                    conversation_context=conv_ctx,
+                    standalone_query=standalone_q,
+                )
+
+            response = await self.conversation_manager.process_transcript(
+                session_id=session_id,
+                transcription=transcription,
+                rag_executor=_rag_executor,
+            )
+        else:
+            response = await self.llm.generate(transcription)
+
+        logger.info("=== LLM / ROUTER OUTPUT ===")
         logger.info(response)
-        logger.info("==================")
+        logger.info("===========================")
         llm_elapsed = time.perf_counter() - start_llm
-        logger.info("LLM completed in %.2f seconds", llm_elapsed)
+        logger.info("Response turnaround completed in %.2f seconds", llm_elapsed)
 
         return OrchestratorResult(transcription=transcription, response=response)
 
