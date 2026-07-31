@@ -534,7 +534,54 @@ async def websocket_audio(
                 break
 
 
+
+# ── Evaluation endpoint ─────────────────────────────────────────────────────
+# This endpoint is used exclusively by the RAG evaluation pipeline.
+# It routes a raw text question directly through the full RAG pipeline
+# (QueryNormalizer → Qdrant → UnknownAnswerDetector → Groq LLM)
+# without going through STT or TTS.
+
+class EvalQueryRequest(BaseModel):
+    question: str
+
+
+class EvalQueryResponse(BaseModel):
+    question: str
+    answer: str
+    status: str
+
+
+@app.post("/eval/query", response_model=EvalQueryResponse)
+async def eval_query(request: EvalQueryRequest):
+    """
+    Direct text-to-RAG evaluation endpoint.
+    Accepts a plain-text question and returns the RAG pipeline answer as JSON.
+    Used exclusively by the evaluation pipeline (rag_evaluator.py).
+    """
+    from app.factories.rag import build_rag_service
+
+    rag_service = build_rag_service()
+    await rag_service.initialize()
+
+    try:
+        rag_response = await rag_service.answer(
+            question=request.question,
+            debug=False,
+        )
+        return EvalQueryResponse(
+            question=request.question,
+            answer=rag_response.answer,
+            status=rag_response.status.value,
+        )
+    except Exception as exc:
+        logger.exception("eval_query pipeline failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        await rag_service.close()
+
+
 if __name__ == "__main__":
+
     import uvicorn
     config = uvicorn.Config(app, host="127.0.0.1", port=8000, loop="asyncio")
     server = uvicorn.Server(config)
